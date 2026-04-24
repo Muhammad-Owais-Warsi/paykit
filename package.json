@@ -17,8 +17,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:demo": "turbo run dev --filter=demo",
-    "dev:web": "turbo run dev --filter=landing",
+    "dev:demo": "bun --filter demo dev",
+    "dev:web": "bun --filter landing dev",
     "typecheck": "turbo run typecheck",
     "format": "oxfmt --write '**/*.{ts,tsx,js,jsx}'",
     "format:check": "oxfmt --check '**/*.{ts,tsx,js,jsx}'",

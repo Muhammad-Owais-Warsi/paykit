@@ -7,4 +7,4 @@ ln -sf "$ROOT/.env" ./
 ln -sf "$ROOT/landing/.env" ./landing/
 ln -sf "$ROOT/apps/demo/.env" ./apps/demo/
 ln -sf "$ROOT/ob" ./ob
-pnpm install
+bun install

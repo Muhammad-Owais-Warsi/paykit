@@ -7,6 +7,12 @@
     "type": "git",
     "url": "https://github.com/getpaykit/paykit"
   },
+  "workspaces": [
+    "landing",
+    "packages/*",
+    "apps/*",
+    "e2e"
+  ],
   "type": "module",
   "scripts": {
     "build": "turbo run build",
@@ -37,7 +43,7 @@
     "typescript": "catalog:"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged"
+    "pre-commit": "bun lint-staged"
   },
   "lint-staged": {
     "!(**/migrations/**)": "oxlint --fix",
@@ -46,14 +52,27 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.4.1",
-  "worktree-up": {
-    "copy": [
-      "**/.env",
-      "**/.env.local",
-      "**/settings.local.json",
-      "ob"
-    ],
-    "run": []
+  "packageManager": "bun@1.3.13",
+  "catalog": {
+    "typescript": "5.9.2",
+    "zod": "^4.3.6",
+    "@types/node": "^25.0.3"
+  },
+  "catalogs": {
+    "react19": {
+      "@types/react": "^19.2.14",
+      "@types/react-dom": "^19.2.3",
+      "react": "^19.2.4",
+      "react-dom": "^19.2.4"
+    },
+    "next16": {
+      "next": "16.1.6"
+    },
+    "tailwind": {
+      "@tailwindcss/postcss": "^4.1.18",
+      "@tailwindcss/vite": "^4.1.18",
+      "tailwindcss": "^4.1.18",
+      "tailwindcss-animate": "^1.0.7"
+    }
   }
 }

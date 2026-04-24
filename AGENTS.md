@@ -12,21 +12,21 @@ Read `ob/spec.md` before making architectural decisions.
 ## Commands
 
 ```bash
-pnpm install          # Install dependencies
-pnpm build            # Build all packages (Turbo)
-pnpm dev              # Dev mode (Turbo, persistent)
-pnpm lint             # Lint with oxlint (--deny-warnings)
-pnpm lint:fix         # Auto-fix lint issues
-pnpm format           # Format with oxfmt
-pnpm format:check     # Check formatting
-pnpm typecheck        # Type check (tsc --build)
+bun install           # Install dependencies
+bun build             # Build all packages (Turbo)
+bun dev               # Dev mode (Turbo, persistent)
+bun lint              # Lint with oxlint (--deny-warnings)
+bun lint:fix          # Auto-fix lint issues
+bun format            # Format with oxfmt
+bun format:check      # Check formatting
+bun typecheck         # Type check (tsc --build)
 ```
 
-Run specific tests with `vitest /path/to/<test-file> -t <pattern>`, not `pnpm test`.
+Run specific tests with `vitest /path/to/<test-file> -t <pattern>`, not `bun test`.
 
 ## Tech Stack
 
-- **Runtime**: Node.js >= 22 | **Package manager**: pnpm 10.4.1 (workspaces)
+- **Runtime**: Node.js >= 22 | **Package manager**: bun 1.3.13 (workspaces)
 - **Build**: Turbo 2.8.10 | **Language**: TypeScript 5.9.2 (strict, composite)
 - **Linter**: oxlint 1.51 | **Formatter**: oxfmt 0.36 | **Validation**: Zod 4
 - **Git hooks**: simple-git-hooks + lint-staged (runs `oxlint --fix` + `oxfmt --write` on commit)
@@ -73,7 +73,7 @@ The only comments you may write should be JSDoc, inlilne clarifying comments, pr
 
 - When asked opinion questions ("Maybe do this?", "what do you think?", "should we do X?"), **only answer** — don't make code changes unless explicitly asked!!
 - Never `git commit`, `git push`, or run database migrations without explicit approval or being asked
-- while generating a db migration, always provide --name. like pnpm db:generate --name add_product_table
+- while generating a db migration, always provide --name. like bun db:generate --name add_product_table
 - never edit past migrations, only way is generating new one
 
 ## gstack

@@ -59,7 +59,7 @@ export function FooterSection() {
         <div className="flex flex-col items-center gap-2 pb-6">
           <p className="text-xs text-foreground/40 font-mono">Ask AI about Paykit</p>
           <div className="flex gap-2">
-            {aiLinks.map((link, i) => (
+            {aiLinks.map((link) => (
               <Link
                 target="_blank"
                 aria-label={`Ask ${link.label} about PayKit`}

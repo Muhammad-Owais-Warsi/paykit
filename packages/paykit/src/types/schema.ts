@@ -413,6 +413,7 @@ export function normalizeSchema(plans: PayKitPlansModule | undefined): Normalize
       } satisfies NormalizedPlanFeature;
     });
 
+    // oxlint-disable-next-line unicorn/no-array-sort -- spread copy, original not mutated
     const sortedIncludes = [...includes].sort((left, right) => left.id.localeCompare(right.id));
     const planData = {
       group,
@@ -427,11 +428,13 @@ export function normalizeSchema(plans: PayKitPlansModule | undefined): Normalize
     plansById.set(exportedPlan.id, { ...planData, hash: computePlanHash(planData) });
   }
 
+  // oxlint-disable-next-line unicorn/no-array-sort -- spread copy, original not mutated
   const sortedPlans = [...plansById.values()].sort((left, right) =>
     left.id.localeCompare(right.id),
   );
 
   return {
+    // oxlint-disable-next-line unicorn/no-array-sort -- spread copy, original not mutated
     features: [...features.values()].sort((left, right) => left.id.localeCompare(right.id)),
     plans: sortedPlans,
     planMap: plansById,

@@ -12,6 +12,7 @@ import { CopyMarkdownButton } from "@/components/docs/copy-markdown-button";
 import { Features } from "@/components/docs/features";
 import { PackageInstall, PackageRun } from "@/components/docs/package-command";
 import { TocFooter } from "@/components/docs/toc-footer";
+import type { SourcePage } from "@/lib/source";
 import { source } from "@/lib/source";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ export default async function Page({ params }: DocsPageProps) {
     redirect("/docs/get-started");
   }
 
-  const page = source.getPage(slug ?? []);
+  const page = source.getPage(slug ?? []) as SourcePage | undefined;
 
   if (!page) notFound();
 

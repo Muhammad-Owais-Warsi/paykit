@@ -17,7 +17,7 @@ export const GET = async (req: Request, { params }: { params: Promise<{ slug?: s
     } else {
       const page = source.getPage(slug ?? []);
       if (!page) notFound();
-      title = page.data.title;
+      title = page.data.title ?? "Documentation";
     }
 
     return new ImageResponse(

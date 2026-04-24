@@ -1,6 +1,6 @@
 import type { FAQPage, Organization, SoftwareApplication, WebSite, WithContext } from "schema-dts";
 
-export const OG_IMAGE_PATH = "/og.png";
+export const OG_IMAGE_PATH = "/brand/og.png";
 export const SITE_NAME = "PayKit";
 
 export const SITE_TITLE = "PayKit – The first billing framework for TypeScript";

@@ -1,43 +1,38 @@
-<h3 align="center">
+<br>
+
+<p align="center">
   <a name="readme-top"></a>
-  <img
-    src="landing/public/favicon/android-chrome-512x512.png"
-    height="180"
-  >
-</h3>
+  <a href="https://paykit.sh">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="landing/public/brand/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="landing/public/brand/logo-light.svg">
+      <img alt="PayKit" src="landing/public/brand/logo-light.svg" height="120">
+    </picture>
+  </a>
+</p>
 
-<div align="center">
-  <a href="https://www.npmjs.com/package/paykitjs">
-    <img src="https://img.shields.io/npm/v/paykitjs.svg?style=flat&colorA=000000&colorB=000000" alt="npm version">
-  </a>
-  <a href="https://github.com/getpaykit/paykit/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/getpaykit/paykit?style=flat&colorA=000000&colorB=000000" alt="License">
-  </a>
-  <a href="https://github.com/getpaykit/paykit/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaykit/paykit?style=flat&colorA=000000&colorB=000000" alt="GitHub stars">
-  </a>
-</div>
+<h3 align="center">The billing framework for TypeScript</h3>
 
-<div>
-  <p align="center">
-    <a href="https://x.com/getpaykit">
-      <img src="https://img.shields.io/badge/Follow%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow on X" />
-    </a>
-    <a href="https://discord.gg/nzy9NPpFNU">
-      <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" />
-    </a>
-  </p>
-</div>
+<p align="center">
+  Define products in code. Any provider. Gate features. Track usage.
+</p>
+
+<p align="center">
+  <a href="https://paykit.sh"><strong>Website</strong></a> ·
+  <a href="https://paykit.sh/docs"><strong>Docs</strong></a> ·
+  <a href="https://discord.gg/nzy9NPpFNU"><strong>Discord</strong></a> ·
+  <a href="https://x.com/getpaykit"><strong>Twitter</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/paykitjs"><img src="https://img.shields.io/npm/v/paykitjs?style=flat-square&color=333" alt="npm version"></a>
+  <a href="https://github.com/getpaykit/paykit/blob/main/LICENSE"><img src="https://img.shields.io/github/license/getpaykit/paykit?style=flat-square&color=333" alt="License"></a>
+  <a href="https://www.npmjs.com/package/paykitjs"><img src="https://img.shields.io/npm/dt/paykitjs?style=flat-square&color=333" alt="npm downloads"></a>
+</p>
 
 ---
 
-# 🛠️ PayKit
-
-**The first billing framework for TypeScript.** Define plans in code, sync with Stripe, gate features, track usage. Open source and runs inside your app. [Learn more](https://paykit.sh).
-
----
-
-## About the Project
+## What is PayKit?
 
 PayKit is an embedded billing framework for TypeScript apps. It sits inside your app, uses your database, and gives you a single API to manage plans, subscriptions, entitlements, and usage billing without touching provider dashboards.
 

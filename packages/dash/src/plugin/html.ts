@@ -42,7 +42,7 @@ export function getDashboardHTML(basePath: string): string {
 <body>
   <div id="root"></div>
   <script>window.__PAYKIT_BASE_PATH__ = "${basePath}";</script>
-  <p>Dashboard not built. Run: pnpm --filter @paykitjs/dash build</p>
+  <p>Dashboard not built. Run: bun --filter @paykitjs/dash build</p>
 </body>
 </html>`;
 }

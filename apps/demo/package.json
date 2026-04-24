@@ -13,7 +13,7 @@
     "start": "next start",
     "paykitjs": "tsx --conditions=paykit-source ../../packages/paykit/src/cli/index.ts",
     "typecheck": "tsc --noEmit",
-    "push": "pnpm paykitjs push && pnpm dlx auth migrate",
+    "push": "bun paykitjs push && bunx auth migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -69,7 +69,7 @@
     "tailwindcss": "^4.0.15",
     "typescript": "^5.8.2"
   },
-  "packageManager": "pnpm@10.4.1",
+  "packageManager": "bun@1.3.13",
   "ct3aMetadata": {
     "initVersion": "7.40.0"
   }

@@ -23,7 +23,7 @@ function resolveFrom(fromDirectory: string, moduleId: string): string | undefine
 
   const require = createRequire(import.meta.url);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Module = require("module");
+  const Module = require("node:module");
 
   try {
     return Module._resolveFilename(moduleId, {

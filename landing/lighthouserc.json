@@ -3,7 +3,7 @@
     "collect": {
       "numberOfRuns": 3,
       "url": ["http://localhost:3000/", "http://localhost:3000/docs"],
-      "startServerCommand": "pnpm start --port 3000",
+      "startServerCommand": "bun start --port 3000",
       "startServerReadyPattern": "Ready",
       "settings": {
         "preset": "desktop"

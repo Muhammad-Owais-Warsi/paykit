@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { notFound } from "next/navigation";
 import { ImageResponse } from "next/og";
 
@@ -6,6 +9,10 @@ import { source } from "@/lib/source";
 export function generateStaticParams() {
   return source.generateParams();
 }
+
+const ogBlankDataUrl = `data:image/png;base64,${(
+  await readFile(join(process.cwd(), "public", "og-blank.png"))
+).toString("base64")}`;
 
 export const GET = async (req: Request, { params }: { params: Promise<{ slug?: string[] }> }) => {
   try {
@@ -32,7 +39,7 @@ export const GET = async (req: Request, { params }: { params: Promise<{ slug?: s
         }}
       >
         <img
-          src="https://github.com/t3duk/paykit/blob/t3duk/feat/sitemap-auto-gen/landing/public/og-blank.png?raw=true"
+          src={ogBlankDataUrl}
           style={{
             position: "absolute",
             inset: 0,

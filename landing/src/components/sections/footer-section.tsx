@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { Github } from "lucide-react";
 import Link from "next/link";
 
@@ -83,7 +82,6 @@ export function FooterSection() {
                   target={link.external ? "_blank" : undefined}
                   rel={link.external ? "noopener noreferrer" : undefined}
                   className="text-foreground/45 hover:text-foreground/70 font-mono text-xs transition-colors"
-                  onClick={() => track("nav_clicked", { link: link.label, location: "footer" })}
                 >
                   {link.label}
                 </Link>
@@ -103,9 +101,6 @@ export function FooterSection() {
                 rel="noopener noreferrer"
                 aria-label={link.label}
                 className="text-foreground/30 hover:text-foreground/60 transition-colors"
-                onClick={() =>
-                  track("social_clicked", { platform: link.label, location: "footer" })
-                }
               >
                 {link.icon}
               </Link>

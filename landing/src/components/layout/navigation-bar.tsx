@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ExternalLink, Github, Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -40,7 +39,6 @@ function NavLink({
       rel={item.external ? "noopener noreferrer" : undefined}
       className={className}
       onClick={() => {
-        track("nav_clicked", { link: item.name, location: "header" });
         onClick?.();
       }}
     >
@@ -226,7 +224,6 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
                   nativeButton={false}
                   variant={"outline"}
                   size="sm"
-                  onClick={() => track("nav_clicked", { link: "github_star", location: "header" })}
                 >
                   <Github className="size-3.5" />
                   <span>GitHub</span>

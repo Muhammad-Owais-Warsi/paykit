@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Loader2, Terminal } from "lucide-react";
 import type { ReactNode } from "react";
@@ -114,7 +113,6 @@ export function HeroCodeBlock({
 
   const runPush = useCallback(async () => {
     if (pushing) return;
-    track("hero_terminal_clicked");
     setPushing(true);
     setView("terminal");
     setTerminalLines([]);

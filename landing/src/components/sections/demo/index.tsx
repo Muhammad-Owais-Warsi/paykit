@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -123,7 +122,6 @@ export function DemoSection({ snippets }: { snippets: Record<SnippetKey, ReactNo
 
   const handleUpgrade = useCallback(async () => {
     if (busy || plan === "pro") return;
-    track("demo_upgrade_clicked");
     setBusy("upgrade");
 
     const cId = addCard("Clicked Upgrade to Pro");
@@ -216,7 +214,6 @@ export function DemoSection({ snippets }: { snippets: Record<SnippetKey, ReactNo
     const text = input.trim();
     if (!text || blocked || aiState !== "idle") return;
 
-    track("demo_message_sent", { message: text });
     setMessages((prev) => [...prev, { role: "user" as const, text }]);
     setInput("");
     if (upgradeBanner) setUpgradeBanner(false);

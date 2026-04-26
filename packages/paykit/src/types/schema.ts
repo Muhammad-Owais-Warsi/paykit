@@ -413,7 +413,7 @@ export function normalizeSchema(plans: PayKitPlansModule | undefined): Normalize
       } satisfies NormalizedPlanFeature;
     });
 
-    const sortedIncludes = [...includes].sort((left, right) => left.id.localeCompare(right.id));
+    const sortedIncludes = includes.toSorted((left, right) => left.id.localeCompare(right.id));
     const planData = {
       group,
       id: exportedPlan.id,
@@ -427,12 +427,12 @@ export function normalizeSchema(plans: PayKitPlansModule | undefined): Normalize
     plansById.set(exportedPlan.id, { ...planData, hash: computePlanHash(planData) });
   }
 
-  const sortedPlans = [...plansById.values()].sort((left, right) =>
+  const sortedPlans = [...plansById.values()].toSorted((left, right) =>
     left.id.localeCompare(right.id),
   );
 
   return {
-    features: [...features.values()].sort((left, right) => left.id.localeCompare(right.id)),
+    features: [...features.values()].toSorted((left, right) => left.id.localeCompare(right.id)),
     plans: sortedPlans,
     planMap: plansById,
   };

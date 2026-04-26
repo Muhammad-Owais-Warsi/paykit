@@ -29,7 +29,7 @@ import type {
 
 function stableStringify(value: Record<string, string> | null | undefined): string {
   if (value == null) return "null";
-  const sorted = Object.keys(value).sort();
+  const sorted = Object.keys(value).toSorted();
   return JSON.stringify(value, sorted);
 }
 

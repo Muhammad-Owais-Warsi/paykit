@@ -484,7 +484,7 @@ html:not([data-anchor-scrolling]) {
 #nd-toc .stroke-fd-primary {
   @apply stroke-fd-muted-foreground;
   stroke-width: 2;
-  transform: translateX(-8px);
+  transform: translateX(-7px);
 }
 
 #nd-toc [data-hidden] {

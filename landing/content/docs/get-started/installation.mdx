@@ -95,13 +95,32 @@ To handle webhooks and client API requests, you need to set up a request handler
 
 Create a new file or route in your framework's designated catch-all route handler. This route should handle requests for the path /paykit/* (unless you've configured a different base path).
 
-<Tabs items={["Next.js", "Other"]}>
+<Tabs items={["Next.js", "Tanstack Start", "Other"]}>
   <Tab value="Next.js">
     ```ts title="src/app/paykit/[[...slug]]/route.ts"
     import { paykitHandler } from "paykitjs/handlers/next";
     import { paykit } from "@/lib/paykit";
 
     export const { GET, POST } = paykitHandler(paykit);
+    ```
+  </Tab>
+  <Tab value="Tanstack Start">
+    ```ts title="src/routes/paykit.$.ts"
+   import { createFileRoute } from "@tanstack/react-router";
+   import { paykit } from "@/lib/paykit";
+
+    async function handle({ request }: { request: Request }) {
+        return paykit.handler(request)
+    }
+    
+    export const Route = createFileRoute("/paykit/$")({
+      server: {
+        handlers: {
+          GET: handle,
+          POST: handle,
+        },
+      },
+    });
     ```
   </Tab>
   <Tab value="Other">

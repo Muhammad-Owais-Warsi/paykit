@@ -29,7 +29,8 @@ import type {
 
 function stableStringify(value: Record<string, string> | null | undefined): string {
   if (value == null) return "null";
-  const sorted = Object.keys(value).toSorted();
+  // oxlint-disable-next-line unicorn/no-array-sort -- already a new array via Object.keys
+  const sorted = Object.keys(value).sort();
   return JSON.stringify(value, sorted);
 }
 

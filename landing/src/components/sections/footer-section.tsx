@@ -56,7 +56,7 @@ export function FooterSection() {
     <Section last>
       <SectionContent>
         <div className="flex flex-col items-center gap-2 pb-6">
-          <p className="text-xs text-foreground/40 font-mono">Ask AI about Paykit</p>
+          <p className="text-xs text-foreground/40 font-mono">Ask AI about PayKit</p>
           <div className="flex gap-2">
             {aiLinks.map((link) => (
               <Link

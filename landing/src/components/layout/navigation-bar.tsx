@@ -137,7 +137,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
             <div className="absolute top-0 right-0 hidden h-full min-[76rem]:block">
               <DashedLine orientation="vertical" />
             </div>
-            <div className="flex items-stretch justify-between px-12">
+            <div className="flex h-12 items-center justify-between px-12">
               {/* Logo */}
               <BrandMenu />
 

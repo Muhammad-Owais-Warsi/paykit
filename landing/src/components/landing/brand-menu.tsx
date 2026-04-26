@@ -2,6 +2,7 @@
 
 import { Code2 } from "lucide-react";
 import Link from "next/link";
+import { useRef } from "react";
 import { toast } from "sonner";
 
 import { Logo } from "@/components/icons/logo";
@@ -21,6 +22,8 @@ const brandAssets = {
 };
 
 export function BrandMenu() {
+  const logoRef = useRef<HTMLAnchorElement>(null);
+
   async function copyAsSvg(asset: BrandAsset) {
     try {
       await navigator.clipboard.writeText(brandAssets[asset]);
@@ -33,24 +36,33 @@ export function BrandMenu() {
   }
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger
-        className={"flex items-center self-start py-3.5 z-10"}
-        render={
-          <Link href="/">
-            <Wordmark className="h-5 scale-105" />
-          </Link>
-        }
-      />
+    <div className="z-10 flex items-center">
+      <ContextMenu>
+        <ContextMenuTrigger
+          className="flex items-center"
+          render={
+            <Link ref={logoRef} href="/" className="flex items-center py-1.5">
+              <Wordmark className="h-5 scale-105" />
+            </Link>
+          }
+        />
 
-      <ContextMenuContent>
-        <ContextMenuItem className="px-3" onClick={() => copyAsSvg("Logo")}>
-          <Logo className="text-muted-foreground" /> Copy logo as SVG
-        </ContextMenuItem>
-        <ContextMenuItem className="px-3" onClick={() => copyAsSvg("Wordmark")}>
-          <Code2 className="text-muted-foreground" /> Copy wordmark as SVG
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+        <ContextMenuContent
+          anchor={logoRef}
+          align="start"
+          alignOffset={0}
+          side="bottom"
+          sideOffset={4}
+          positionerClassName="z-100"
+        >
+          <ContextMenuItem className="px-3" onClick={() => copyAsSvg("Logo")}>
+            <Logo className="text-muted-foreground" /> Copy logo as SVG
+          </ContextMenuItem>
+          <ContextMenuItem className="px-3" onClick={() => copyAsSvg("Wordmark")}>
+            <Code2 className="text-muted-foreground" /> Copy wordmark as SVG
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
   );
 }

@@ -23,7 +23,9 @@ export function ThemeSwitcher() {
       ) : (
         <Sun className="size-4.5 text-current" suppressHydrationWarning />
       )}
-      <span className="sr-only">{toggleLabel}</span>
+      <span className="sr-only" suppressHydrationWarning>
+        {toggleLabel}
+      </span>
     </Button>
   );
 }

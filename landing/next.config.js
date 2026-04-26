@@ -44,18 +44,6 @@ const config = {
       permanent: false,
     },
   ],
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-      {
-        protocol: "http",
-        hostname: "**",
-      },
-    ],
-  },
 };
 
 export default withMDX(config);

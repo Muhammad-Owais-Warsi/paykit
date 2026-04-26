@@ -4,9 +4,7 @@ import { CommandMenuProvider } from "@/components/command-menu";
 import { NavigationBar } from "@/components/layout/navigation-bar";
 import { PageTransition } from "@/components/layout/page-transition";
 
-export default async function MarketingLayout({ children }: { children: ReactNode }) {
-  // const stars = await getGitHubStars();
-
+export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <CommandMenuProvider>
       <div className="dark bg-background text-foreground relative h-dvh overflow-x-hidden">

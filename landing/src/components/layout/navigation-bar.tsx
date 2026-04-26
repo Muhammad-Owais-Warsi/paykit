@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ExternalLink, Github, Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -40,7 +39,6 @@ function NavLink({
       rel={item.external ? "noopener noreferrer" : undefined}
       className={className}
       onClick={() => {
-        track("nav_clicked", { link: item.name, location: "header" });
         onClick?.();
       }}
     >
@@ -113,13 +111,16 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           transition={{ duration: 0.28, ease: "easeOut" }}
           className="bg-background border-foreground/6 pointer-events-auto flex w-full items-center justify-between border-b lg:hidden"
         >
-          <Link href="/" className="flex items-center gap-1 px-4 py-3">
-            <Wordmark className="h-4" />
+          <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
+            <Wordmark title={null} className="h-4 origin-left scale-110" />
           </Link>
           <button
             type="button"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-controls="mobile-navigation-menu"
+            aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="text-foreground/65 dark:text-foreground/50 hover:text-foreground/80 px-4 py-3 transition-colors"
+            className="text-foreground/65 dark:text-foreground/50 hover:text-foreground/80 px-5 py-3 transition-colors"
           >
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -139,7 +140,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
             <div className="absolute top-0 right-0 hidden h-full min-[76rem]:block">
               <DashedLine orientation="vertical" />
             </div>
-            <div className="flex items-stretch justify-between px-12">
+            <div className="flex h-12 items-center justify-between px-12">
               {/* Logo */}
               <BrandMenu />
 
@@ -226,7 +227,6 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
                   nativeButton={false}
                   variant={"outline"}
                   size="sm"
-                  onClick={() => track("nav_clicked", { link: "github_star", location: "header" })}
                 >
                   <Github className="size-3.5" />
                   <span>GitHub</span>
@@ -241,6 +241,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="mobile-navigation-menu"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

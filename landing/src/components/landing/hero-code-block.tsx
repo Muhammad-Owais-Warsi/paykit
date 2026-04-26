@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Loader2, Terminal } from "lucide-react";
 import type { ReactNode } from "react";
@@ -114,7 +113,6 @@ export function HeroCodeBlock({
 
   const runPush = useCallback(async () => {
     if (pushing) return;
-    track("hero_terminal_clicked");
     setPushing(true);
     setView("terminal");
     setTerminalLines([]);
@@ -141,7 +139,7 @@ export function HeroCodeBlock({
   }, []);
 
   return (
-    <div className="border-border w-full max-w-[37rem] shrink rounded-[10px] border p-[4px] lg:flex-1">
+    <div className="border-border w-full max-w-full min-w-0 rounded-[10px] border p-[4px] sm:w-[37rem] lg:w-full lg:max-w-[37rem]">
       <div className="border-foreground/[0.1] bg-card flex flex-col overflow-hidden rounded-[6px] border">
         {/* Tab bar */}
         <div className="border-foreground/[0.08] flex items-center border-b">
@@ -204,11 +202,15 @@ export function HeroCodeBlock({
               {view === "code" ? "Terminal" : "Back to code"}
             </Button>
           </div>
-          <div className="h-full overflow-y-auto">
+          <div className="h-full min-h-0 min-w-0 overflow-hidden">
             {view === "code" ? (
               <>
-                <div className={activeTab === "plans" ? "block" : "hidden"}>{plansCodeBlock}</div>
-                <div className={activeTab === "config" ? "block" : "hidden"}>{configCodeBlock}</div>
+                <div className={activeTab === "plans" ? "block h-full min-w-0" : "hidden"}>
+                  {plansCodeBlock}
+                </div>
+                <div className={activeTab === "config" ? "block h-full min-w-0" : "hidden"}>
+                  {configCodeBlock}
+                </div>
               </>
             ) : (
               <div className="h-full bg-[#0e0e0e] p-4 font-mono text-[12px] leading-relaxed">

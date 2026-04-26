@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronRight, Copy, Sparkle } from "lucide-react";
 import Link from "next/link";
@@ -15,7 +14,6 @@ export function HeroTitle() {
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText("npx paykitjs init");
     setCopied(true);
-    track("cta_clicked", { button: "copy_init_command", page: "home" });
     setTimeout(() => setCopied(false), 1500);
   }, []);
 
@@ -32,7 +30,7 @@ export function HeroTitle() {
           </span>
         </div>
         <h1 className="max-w-4xl text-3xl leading-tight tracking-tight text-neutral-800 sm:text-3xl md:text-3xl lg:text-[2.5rem] dark:text-neutral-200">
-          The first billing framework <br />
+          The billing framework <br />
           for <span className="border-foreground/20 border-b border-dashed">TypeScript</span>
         </h1>
 
@@ -48,7 +46,6 @@ export function HeroTitle() {
             size="lg"
             className="px-4 h-9.5"
             variant="default"
-            onClick={() => track("cta_clicked", { button: "read_docs", page: "home" })}
           >
             Read Docs
           </Button>

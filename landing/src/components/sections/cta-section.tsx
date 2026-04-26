@@ -1,6 +1,5 @@
 "use client";
 
-import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import Link from "next/link";
@@ -16,7 +15,6 @@ export function CTASection() {
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText("npx paykitjs init");
     setCopied(true);
-    track("cta_clicked", { button: "copy_init_command", page: "cta_section" });
     setTimeout(() => setCopied(false), 1500);
   }, []);
 
@@ -32,13 +30,7 @@ export function CTASection() {
             minutes.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              render={<Link href="/docs" />}
-              nativeButton={false}
-              size="lg"
-              className="px-4"
-              onClick={() => track("cta_clicked", { button: "get_started", page: "cta_section" })}
-            >
+            <Button render={<Link href="/docs" />} nativeButton={false} size="lg" className="px-4">
               Get Started
             </Button>
             <Button

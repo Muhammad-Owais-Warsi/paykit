@@ -180,7 +180,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         children: <SidebarCollapseButton key="sidebar-collapse" />,
         title: (
           <div className="flex flex-row items-center">
-            <Wordmark className="h-4.5" />
+            <Wordmark title="PayKit" className="h-4.5" />
             {VERSION_TEXT && (
               <Badge
                 className="text-muted-foreground mb-0.5 ml-3 rounded-md px-1"

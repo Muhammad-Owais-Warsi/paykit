@@ -3,7 +3,7 @@ import type { FAQPage, Organization, SoftwareApplication, WebSite, WithContext }
 export const OG_IMAGE_PATH = "/brand/og.png";
 export const SITE_NAME = "PayKit";
 
-export const SITE_TITLE = "PayKit – The first billing framework for TypeScript";
+export const SITE_TITLE = "PayKit – The billing framework for TypeScript";
 export const SITE_DESCRIPTION =
   "Open-source billing framework for TypeScript. Define plans in code. Handles Stripe, webhooks, and subscriptions automatically. Runs inside your app.";
 

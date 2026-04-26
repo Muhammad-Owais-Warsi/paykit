@@ -473,6 +473,10 @@ html:not([data-anchor-scrolling]) {
   padding-inline-start: 14px !important;
 }
 
+#nd-toc a[href^="#"] > .inset-y-0 {
+  inset-inline-start: 0px !important;
+}
+
 #nd-toc a[href^="#"] > .absolute {
   inset-inline-start: 0px !important;
 }
@@ -480,6 +484,7 @@ html:not([data-anchor-scrolling]) {
 #nd-toc .stroke-fd-primary {
   @apply stroke-fd-muted-foreground;
   stroke-width: 2;
+  transform: translateX(-7px);
 }
 
 #nd-toc [data-hidden] {

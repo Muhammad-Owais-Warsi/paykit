@@ -1,9 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
 
-import { Wordmark } from "@/components/icons/wordmark";
+import { BrandMenu } from "@/components/landing/brand-menu";
 
 import { DashedLine } from "./section";
 
@@ -22,10 +21,8 @@ export function MiniNavBar() {
         <div className="absolute top-0 right-0 hidden h-full min-[76rem]:block">
           <DashedLine orientation="vertical" />
         </div>
-        <div className="flex items-center px-12 py-3.5">
-          <Link href="/">
-            <Wordmark className="h-5" />
-          </Link>
+        <div className="flex h-12 items-center px-12">
+          <BrandMenu />
         </div>
       </div>
     </motion.div>

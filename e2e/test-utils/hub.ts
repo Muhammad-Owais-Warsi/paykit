@@ -33,6 +33,11 @@ function extractStripeCustomerId(body: string): string | null {
   }
 }
 
+async function forwardEvent(workerUrl: string, event: BufferedEvent): Promise<Response> {
+  const url = new URL(event.path, workerUrl);
+  return fetch(url, { method: "POST", headers: event.headers, body: event.body });
+}
+
 export function startHub(): Promise<Server> {
   const registry = new Map<string, string>();
   const buffers = new Map<string, BufferedEvent[]>();
@@ -44,11 +49,6 @@ export function startHub(): Promise<Server> {
     const kept = buf.filter((e) => now - e.receivedAt < BUFFER_TTL_MS);
     if (kept.length === 0) buffers.delete(customerId);
     else buffers.set(customerId, kept);
-  }
-
-  async function forwardEvent(workerUrl: string, event: BufferedEvent): Promise<Response> {
-    const url = new URL(event.path, workerUrl);
-    return fetch(url, { method: "POST", headers: event.headers, body: event.body });
   }
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {

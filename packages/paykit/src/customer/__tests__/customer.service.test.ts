@@ -121,6 +121,7 @@ describe("customer/service", () => {
     const customer = await upsertCustomer(ctx, {
       email: "test@example.com",
       id: "customer_123",
+      upsertProviderCustomer: true,
     });
 
     expect(customer).toEqual(syncedCustomer);
@@ -215,6 +216,7 @@ describe("customer/service", () => {
     await upsertCustomer(ctx, {
       email: "prod@example.com",
       id: "customer_123",
+      upsertProviderCustomer: true,
     });
 
     expect(stripe.createCustomer).toHaveBeenCalledWith({
@@ -385,6 +387,7 @@ describe("customer/service", () => {
     const result = await upsertCustomer(ctx, {
       email: "same@example.com",
       id: "customer_123",
+      upsertProviderCustomer: true,
     });
 
     expect(providerMock.createCustomer).not.toHaveBeenCalled();
@@ -437,6 +440,7 @@ describe("customer/service", () => {
     await upsertCustomer(ctx, {
       email: "new@example.com",
       id: "customer_123",
+      upsertProviderCustomer: true,
     });
 
     expect(providerMock.updateCustomer).toHaveBeenCalledWith(
@@ -483,6 +487,7 @@ describe("customer/service", () => {
     await upsertCustomer(ctx, {
       email: "test@example.com",
       id: "customer_123",
+      upsertProviderCustomer: true,
     });
 
     expect(providerMock.updateCustomer).toHaveBeenCalled();

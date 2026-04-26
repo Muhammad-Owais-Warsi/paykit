@@ -19,6 +19,7 @@
     "dev": "turbo run dev",
     "dev:demo": "bun --filter demo dev",
     "dev:web": "bun --filter landing dev",
+    "test:unit": "node ./node_modules/vitest/vitest.mjs run --config vitest.unit.config.ts",
     "typecheck": "turbo run typecheck",
     "format": "oxfmt --write '**/*.{ts,tsx,js,jsx}'",
     "format:check": "oxfmt --check '**/*.{ts,tsx,js,jsx}'",
@@ -40,7 +41,8 @@
     "tinyglobby": "^0.2.16",
     "tsx": "^4.21.0",
     "turbo": "^2.8.10",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.0.18"
   },
   "simple-git-hooks": {
     "pre-commit": "bun lint-staged"

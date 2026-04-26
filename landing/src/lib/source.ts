@@ -9,7 +9,5 @@ export const source = loader({
 });
 
 export type SourcePage = InferPageType<typeof source> & {
-  data: InferPageType<typeof source>["data"] &
-    DocData &
-    DocMethods & { full?: boolean };
+  data: InferPageType<typeof source>["data"] & DocData & DocMethods & { full?: boolean };
 };

@@ -1,4 +1,4 @@
 {
   "ignoreCommand": "npx turbo-ignore landing",
-  "installCommand": "SKIP_INSTALL_SIMPLE_GIT_HOOKS=1 bun install"
+  "installCommand": "bun install"
 }

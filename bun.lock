@@ -11,7 +11,6 @@
         "lint-staged": "^16.2.7",
         "oxfmt": "^0.36.0",
         "oxlint": "^1.51.0",
-        "simple-git-hooks": "^2.13.1",
         "tinyglobby": "^0.2.16",
         "tsx": "^4.21.0",
         "turbo": "^2.8.10",
@@ -2214,8 +2213,6 @@
     "siginfo": ["siginfo@2.0.0", "https://registry.better-npm.dev/siginfo/-/siginfo-2.0.0.tgz", {}, "sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g=="],
 
     "signal-exit": ["signal-exit@4.1.0", "https://registry.better-npm.dev/signal-exit/-/signal-exit-4.1.0.tgz", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
-
-    "simple-git-hooks": ["simple-git-hooks@2.13.1", "https://registry.better-npm.dev/simple-git-hooks/-/simple-git-hooks-2.13.1.tgz", { "bin": { "simple-git-hooks": "cli.js" } }, "sha512-WszCLXwT4h2k1ufIXAgsbiTOazqqevFCIncOuUBZJ91DdvWcC5+OFkluWRQPrcuSYd8fjq+o2y1QfWqYMoAToQ=="],
 
     "sisteransi": ["sisteransi@1.0.5", "https://registry.better-npm.dev/sisteransi/-/sisteransi-1.0.5.tgz", {}, "sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg=="],
 

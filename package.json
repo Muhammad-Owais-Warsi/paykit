@@ -27,7 +27,7 @@
     "lint:fix": "oxlint --fix",
     "release": "turbo build --filter=./packages/* && bumpp",
     "release:canary": "turbo build --filter=./packages/* && bumpp --tag canary",
-    "prepare": "simple-git-hooks",
+    "prepare": "bunx simple-git-hooks || true",
     "worktree:setup": "bash scripts/worktree-setup.sh"
   },
   "devDependencies": {
@@ -37,7 +37,6 @@
     "lint-staged": "^16.2.7",
     "oxfmt": "^0.36.0",
     "oxlint": "^1.51.0",
-    "simple-git-hooks": "^2.13.1",
     "tinyglobby": "^0.2.16",
     "tsx": "^4.21.0",
     "turbo": "^2.8.10",

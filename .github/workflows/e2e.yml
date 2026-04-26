@@ -4,31 +4,16 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 6 * * *"
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-      - labeled
 
 permissions: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   stripe:
     name: Stripe E2E
-    if: |
-      github.event_name != 'pull_request' ||
-      (
-        github.event.pull_request.head.repo.full_name == github.repository &&
-        !github.event.pull_request.draft &&
-        contains(github.event.pull_request.labels.*.name, 'run-e2e')
-      )
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-stripe
+      cancel-in-progress: false
     timeout-minutes: 60
     permissions:
       contents: read

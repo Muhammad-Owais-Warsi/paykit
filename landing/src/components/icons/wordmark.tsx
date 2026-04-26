@@ -16,10 +16,11 @@ const wordmarkPaths = [
 export const WORDMARK_SVG = `<svg width="2213" height="577" viewBox="0 0 2213 577" fill="none" xmlns="http://www.w3.org/2000/svg">${wordmarkPaths.map((path) => `<path d="${path}" fill="currentColor"/>`).join("")}</svg>`;
 
 export function Wordmark({
-  title = "PayKit",
+  title,
   ...props
-}: React.ComponentProps<"svg"> & { title?: string }) {
+}: React.ComponentProps<"svg"> & { title?: string | null }) {
   const titleId = useId();
+  const hasTitle = title != null;
 
   return (
     <svg
@@ -27,11 +28,11 @@ export function Wordmark({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-labelledby={title ? titleId : undefined}
-      aria-hidden={title ? undefined : true}
+      aria-labelledby={hasTitle ? titleId : undefined}
+      aria-hidden={hasTitle ? undefined : true}
       {...props}
     >
-      {title ? <title id={titleId}>{title}</title> : null}
+      {hasTitle ? <title id={titleId}>{title}</title> : null}
       {wordmarkPaths.map((path) => (
         <path key={path} d={path} fill="currentColor" />
       ))}

@@ -112,7 +112,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           className="bg-background border-foreground/6 pointer-events-auto flex w-full items-center justify-between border-b lg:hidden"
         >
           <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
-            <Wordmark title={undefined} className="h-4 origin-left scale-110" />
+            <Wordmark title={null} className="h-4 origin-left scale-110" />
           </Link>
           <button
             type="button"

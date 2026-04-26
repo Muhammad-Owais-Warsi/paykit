@@ -47,7 +47,7 @@ export function BrandMenu() {
               aria-label="PayKit home"
               className="flex items-center py-1.5"
             >
-              <Wordmark title={undefined} className="h-5 origin-left scale-105" />
+              <Wordmark title={null} className="h-5 origin-left scale-105" />
             </Link>
           }
         />

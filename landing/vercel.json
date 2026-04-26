@@ -1,4 +1,4 @@
 {
-  "ignoreCommand": "npx turbo-ignore landing",
+  "ignoreCommand": "bunx turbo-ignore landing",
   "installCommand": "bun install"
 }

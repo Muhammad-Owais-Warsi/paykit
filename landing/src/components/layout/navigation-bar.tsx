@@ -112,7 +112,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           className="bg-background border-foreground/6 pointer-events-auto flex w-full items-center justify-between border-b lg:hidden"
         >
           <Link href="/" className="flex items-center gap-1 px-4 py-3">
-            <Wordmark className="h-4" />
+            <Wordmark className="h-4 scale-105" />
           </Link>
           <button
             type="button"

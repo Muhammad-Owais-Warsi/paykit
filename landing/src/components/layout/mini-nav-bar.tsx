@@ -23,8 +23,8 @@ export function MiniNavBar() {
           <DashedLine orientation="vertical" />
         </div>
         <div className="flex items-center px-12 py-3.5">
-          <Link href="/">
-            <Wordmark className="h-5" />
+          <Link href="/" className="flex items-center">
+            <Wordmark className="h-5 scale-105" />
           </Link>
         </div>
       </div>

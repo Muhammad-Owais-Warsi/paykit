@@ -41,8 +41,13 @@ export function BrandMenu() {
         <ContextMenuTrigger
           className="flex items-center"
           render={
-            <Link ref={logoRef} href="/" className="flex items-center py-1.5">
-              <Wordmark className="h-5 origin-left scale-105" />
+            <Link
+              ref={logoRef}
+              href="/"
+              aria-label="PayKit home"
+              className="flex items-center py-1.5"
+            >
+              <Wordmark title={undefined} className="h-5 origin-left scale-105" />
             </Link>
           }
         />

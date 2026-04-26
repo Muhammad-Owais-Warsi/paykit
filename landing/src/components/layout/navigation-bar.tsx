@@ -111,11 +111,14 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           transition={{ duration: 0.28, ease: "easeOut" }}
           className="bg-background border-foreground/6 pointer-events-auto flex w-full items-center justify-between border-b lg:hidden"
         >
-          <Link href="/" className="flex items-center gap-1 px-5 py-3">
-            <Wordmark className="h-4 origin-left scale-110" />
+          <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
+            <Wordmark title={undefined} className="h-4 origin-left scale-110" />
           </Link>
           <button
             type="button"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-controls="mobile-navigation-menu"
+            aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             className="text-foreground/65 dark:text-foreground/50 hover:text-foreground/80 px-5 py-3 transition-colors"
           >
@@ -238,6 +241,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="mobile-navigation-menu"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

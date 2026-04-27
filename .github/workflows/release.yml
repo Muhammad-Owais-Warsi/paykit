@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      checks: read
       contents: write
       id-token: write
     steps:
@@ -28,7 +29,7 @@ jobs:
           required_checks=("CLI E2E" "Stripe E2E" "Polar E2E")
 
           for check_name in "${required_checks[@]}"; do
-            conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs" --jq ".check_runs | map(select(.app.slug == \"github-actions\" and .name == \"${check_name}\")) | sort_by(.completed_at) | last | .conclusion // \"missing\"")
+            conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?per_page=100" --jq ".check_runs | map(select(.app.slug == \"github-actions\" and .name == \"${check_name}\")) | sort_by(.completed_at) | last | .conclusion // \"missing\"")
 
             if [ "$conclusion" != "success" ]; then
               echo "::error::Required E2E check '$check_name' is '$conclusion' for commit ${GITHUB_SHA}. Run the full E2E workflow on this exact SHA before releasing."

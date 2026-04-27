@@ -2,17 +2,14 @@ import { stripe } from "@paykitjs/stripe";
 import { chromium } from "playwright";
 import { default as Stripe } from "stripe";
 
-import type { PayKitDatabase } from "../../../packages/paykit/src/database/index";
-import { syncPaymentMethodByProviderCustomer } from "../../../packages/paykit/src/payment-method/payment-method.service";
+import type { PaymentProvider } from "../../../packages/paykit/src/providers/provider";
 import { env } from "../env";
 import type { ProviderHarness } from "./types";
 
 export function createStripeHarness(): ProviderHarness {
+  validateStripeEnv();
   const secretKey = env.E2E_STRIPE_SK;
   const webhookSecret = env.E2E_STRIPE_WHSEC;
-  if (!secretKey || !webhookSecret) {
-    throw new Error("E2E_STRIPE_SK and E2E_STRIPE_WHSEC must be set");
-  }
 
   const stripeClient = new Stripe(secretKey, { maxNetworkRetries: 3 });
 
@@ -31,10 +28,10 @@ export function createStripeHarness(): ProviderHarness {
       // Stripe's real createSubscription uses payment_behavior: "default_incomplete",
       // which requires client-side confirmation via Stripe.js. In tests we want the
       // subscription to activate straight away from the server after a PM is attached.
-      (ctx.provider as unknown as Record<string, unknown>).createSubscription = async (data: {
-        providerCustomerId: string;
-        providerProduct: Record<string, string>;
-      }) => {
+      const provider = ctx.provider as PaymentProvider;
+      provider.createSubscription = async (
+        data: Parameters<PaymentProvider["createSubscription"]>[0],
+      ) => {
         const sub = await stripeClient.subscriptions.create({
           customer: data.providerCustomerId,
           items: [{ price: data.providerProduct.priceId }],
@@ -91,9 +88,9 @@ export function createStripeHarness(): ProviderHarness {
 
     async completeCheckout(url: string) {
       const browser = await chromium.launch({ headless: true });
-      const page = await browser.newPage();
 
       try {
+        const page = await browser.newPage();
         await page.goto(url, { waitUntil: "domcontentloaded" });
 
         // Stripe's hosted checkout uses custom inputs that require per-key events;
@@ -116,7 +113,7 @@ export function createStripeHarness(): ProviderHarness {
         }
 
         const submitBtn = page.locator(".SubmitButton-TextContainer").first();
-        await submitBtn.evaluate((el) => (el as HTMLElement).click());
+        await submitBtn.click();
 
         // Wait for Stripe to navigate away from the checkout page (success redirect
         // or embedded confirmation). Don't fail the test if this times out — the
@@ -148,38 +145,13 @@ export function createStripeHarness(): ProviderHarness {
     },
 
     validateEnv() {
-      if (!env.E2E_STRIPE_SK || !env.E2E_STRIPE_WHSEC) {
-        throw new Error("E2E_STRIPE_SK and E2E_STRIPE_WHSEC must be set");
-      }
+      validateStripeEnv();
     },
   };
 }
 
-/** Sync a Stripe payment method into the PayKit database. */
-export async function syncStripePaymentMethod(input: {
-  database: PayKitDatabase;
-  providerCustomerId: string;
-  providerId: string;
-  stripeClient: Stripe;
-}): Promise<void> {
-  const pm = await input.stripeClient.paymentMethods.list({
-    customer: input.providerCustomerId,
-    type: "card",
-    limit: 1,
-  });
-  const method = pm.data[0];
-  if (!method) return;
-
-  await syncPaymentMethodByProviderCustomer(input.database, {
-    paymentMethod: {
-      providerMethodId: method.id,
-      type: method.type,
-      last4: method.card?.last4,
-      expiryMonth: method.card?.exp_month,
-      expiryYear: method.card?.exp_year,
-      isDefault: true,
-    },
-    providerCustomerId: input.providerCustomerId,
-    providerId: input.providerId,
-  });
+function validateStripeEnv(): void {
+  if (!env.E2E_STRIPE_SK || !env.E2E_STRIPE_WHSEC) {
+    throw new Error("E2E_STRIPE_SK and E2E_STRIPE_WHSEC must be set");
+  }
 }

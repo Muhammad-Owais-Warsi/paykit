@@ -102,7 +102,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      CF_TUNNEL_HOST: ${{ vars.CF_TUNNEL_HOST_STRIPE || 't1.paykit.sh' }}
       E2E_STRIPE_SK: ${{ secrets.E2E_STRIPE_SK }}
       E2E_STRIPE_WHSEC: ${{ secrets.E2E_STRIPE_WHSEC }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -161,15 +160,32 @@ jobs:
 
           trap cleanup EXIT
 
-          sleep 5
+          readiness_timeout_s=30
+          readiness_deadline=$((SECONDS + readiness_timeout_s))
 
-          if ! kill -0 "$cloudflared_pid" 2>/dev/null; then
-            echo "::error::cloudflared exited before tests started"
-            if [ -f cloudflared.log ]; then
-              cat cloudflared.log
+          while true; do
+            if ! kill -0 "$cloudflared_pid" 2>/dev/null; then
+              echo "::error::cloudflared exited before tests started"
+              if [ -f cloudflared.log ]; then
+                cat cloudflared.log
+              fi
+              exit 1
             fi
-            exit 1
-          fi
+
+            if [ -f cloudflared.log ] && grep -Eq 'Registered tunnel|Connection [A-Za-z0-9]+ registered|INF.*Registered tunnel connection' cloudflared.log; then
+              break
+            fi
+
+            if [ "$SECONDS" -ge "$readiness_deadline" ]; then
+              echo "::error::Timed out waiting for cloudflared readiness"
+              if [ -f cloudflared.log ]; then
+                cat cloudflared.log
+              fi
+              exit 1
+            fi
+
+            sleep 0.5
+          done
 
           bun --filter e2e test:stripe
 
@@ -206,7 +222,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      CF_TUNNEL_HOST: ${{ vars.CF_TUNNEL_HOST_POLAR || 't2.paykit.sh' }}
       E2E_POLAR_ACCESS_TOKEN: ${{ secrets.E2E_POLAR_ACCESS_TOKEN }}
       E2E_POLAR_WHSEC: ${{ secrets.E2E_POLAR_WHSEC }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -265,15 +280,32 @@ jobs:
 
           trap cleanup EXIT
 
-          sleep 5
+          readiness_timeout_s=30
+          readiness_deadline=$((SECONDS + readiness_timeout_s))
 
-          if ! kill -0 "$cloudflared_pid" 2>/dev/null; then
-            echo "::error::cloudflared exited before tests started"
-            if [ -f cloudflared.log ]; then
-              cat cloudflared.log
+          while true; do
+            if ! kill -0 "$cloudflared_pid" 2>/dev/null; then
+              echo "::error::cloudflared exited before tests started"
+              if [ -f cloudflared.log ]; then
+                cat cloudflared.log
+              fi
+              exit 1
             fi
-            exit 1
-          fi
+
+            if [ -f cloudflared.log ] && grep -Eq 'Registered tunnel|Connection [A-Za-z0-9]+ registered|INF.*Registered tunnel connection' cloudflared.log; then
+              break
+            fi
+
+            if [ "$SECONDS" -ge "$readiness_deadline" ]; then
+              echo "::error::Timed out waiting for cloudflared readiness"
+              if [ -f cloudflared.log ]; then
+                cat cloudflared.log
+              fi
+              exit 1
+            fi
+
+            sleep 0.5
+          done
 
           bun --filter e2e test:polar
 

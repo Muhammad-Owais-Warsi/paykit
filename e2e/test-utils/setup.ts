@@ -57,6 +57,17 @@ export interface CapturedWebhookRequest {
 const activeSubscriptionStatuses = ["active", "trialing", "past_due"] as const;
 const presentSubscriptionStatuses = [...activeSubscriptionStatuses, "scheduled"] as const;
 
+function buildUniqueTestEmail(input: { email: string; suffix: string }): string {
+  const [localPart, domain = ""] = input.email.split("@");
+  if (!localPart || !domain) {
+    throw new Error(`Invalid test email: ${input.email}`);
+  }
+
+  const uniqueLocalPart = `${localPart}+${input.suffix}`;
+
+  return `${uniqueLocalPart}@e2e.paykit.sh`;
+}
+
 export async function createTestPayKit(): Promise<TestPayKit> {
   harness.validateEnv();
 
@@ -143,7 +154,10 @@ export async function createTestCustomer(input: {
 }): Promise<{ customerId: string; providerCustomerId: string }> {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const uniqueId = `${input.customer.id}_${suffix}`;
-  const uniqueEmail = input.customer.email.replace("@", `+${suffix}@`);
+  const uniqueEmail = buildUniqueTestEmail({
+    email: input.customer.email,
+    suffix,
+  });
 
   await input.t.paykit.upsertCustomer({
     ...input.customer,

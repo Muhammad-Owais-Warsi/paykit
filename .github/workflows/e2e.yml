@@ -13,8 +13,6 @@ on:
           - cli
           - stripe
           - polar
-  schedule:
-    - cron: "0 6 * * *"
 
 permissions: {}
 

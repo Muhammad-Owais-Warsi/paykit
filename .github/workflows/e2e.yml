@@ -2,14 +2,84 @@ name: E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: E2E target to run
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - cli
+          - stripe
+          - polar
   schedule:
     - cron: "0 6 * * *"
 
 permissions: {}
 
 jobs:
+  cli:
+    name: CLI E2E
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == 'cli' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-stripe
+      cancel-in-progress: false
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      E2E_STRIPE_SK: ${{ secrets.E2E_STRIPE_SK }}
+      E2E_STRIPE_WHSEC: ${{ secrets.E2E_STRIPE_WHSEC }}
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate CLI E2E configuration
+        run: |
+          set -euo pipefail
+          for name in E2E_STRIPE_SK E2E_STRIPE_WHSEC TEST_DATABASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required configuration: $name"
+              exit 1
+            fi
+          done
+
+      - name: Run CLI E2E suite
+        run: bun --filter e2e test:cli
+
   stripe:
     name: Stripe E2E
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == 'stripe' }}
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.workflow }}-stripe
@@ -109,4 +179,108 @@ jobs:
         with:
           if-no-files-found: ignore
           name: stripe-e2e-cloudflared-log
+          path: cloudflared.log
+
+  polar:
+    name: Polar E2E
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == 'polar' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-polar
+      cancel-in-progress: false
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CF_TUNNEL_HOST: ${{ vars.CF_TUNNEL_HOST_POLAR || 't2.paykit.sh' }}
+      E2E_POLAR_ACCESS_TOKEN: ${{ secrets.E2E_POLAR_ACCESS_TOKEN }}
+      E2E_POLAR_WHSEC: ${{ secrets.E2E_POLAR_WHSEC }}
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate Polar E2E configuration
+        env:
+          CF_TUNNEL_TOKEN: ${{ secrets.CF_TUNNEL_TOKEN_POLAR }}
+        run: |
+          set -euo pipefail
+          for name in CF_TUNNEL_TOKEN E2E_POLAR_ACCESS_TOKEN E2E_POLAR_WHSEC TEST_DATABASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required configuration: $name"
+              exit 1
+            fi
+          done
+
+      - name: Setup cloudflared
+        uses: AnimMouse/setup-cloudflared@v2
+
+      - name: Check cloudflared version
+        run: cloudflared --version
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run Polar E2E suite
+        env:
+          CF_TUNNEL_TOKEN: ${{ secrets.CF_TUNNEL_TOKEN_POLAR }}
+        run: |
+          set -euo pipefail
+          cloudflared tunnel --url http://127.0.0.1:4567 run --token "$CF_TUNNEL_TOKEN" > cloudflared.log 2>&1 &
+          cloudflared_pid=$!
+
+          cleanup() {
+            if kill -0 "$cloudflared_pid" 2>/dev/null; then
+              kill "$cloudflared_pid" || true
+              wait "$cloudflared_pid" || true
+            fi
+          }
+
+          trap cleanup EXIT
+
+          sleep 5
+
+          if ! kill -0 "$cloudflared_pid" 2>/dev/null; then
+            echo "::error::cloudflared exited before tests started"
+            if [ -f cloudflared.log ]; then
+              cat cloudflared.log
+            fi
+            exit 1
+          fi
+
+          bun --filter e2e test:polar
+
+      - name: Upload cloudflared log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: ignore
+          name: polar-e2e-cloudflared-log
           path: cloudflared.log

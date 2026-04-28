@@ -7,7 +7,7 @@ import "./src/env.js";
 
 const withMDX = createMDX();
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(currentDir, "..");
+const repoRoot = join(currentDir, "../..");
 
 /** @type {import("next").NextConfig} */
 const config = {

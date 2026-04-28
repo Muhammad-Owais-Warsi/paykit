@@ -2,7 +2,7 @@
 
 ## Design References
 
-These are landing pages we admire and draw inspiration from. We don't copy any of them directly — PayKit has its own identity. Use these as a reference for quality, tone, and craft.
+These are web pages we admire and draw inspiration from. We don't copy any of them directly — PayKit has its own identity. Use these as a reference for quality, tone, and craft.
 
 - [Vercel](https://vercel.com/home)
 - [Better Auth](https://better-auth.com/)
@@ -44,7 +44,7 @@ These are landing pages we admire and draw inspiration from. We don't copy any o
 
 ## Section Layout
 
-- All landing sections use `Section` + `SectionContent` from `layout/section.tsx`.
+- All web sections use `Section` + `SectionContent` from `layout/section.tsx`.
 - Dashed borders are rendered via SVG `DashedLine` components, not CSS `border-dashed`.
 - Section separators use `SectionSeparator` for full section-width dashed lines.
 - Uniform padding across all sections via `SectionContent` (currently `p-12`).

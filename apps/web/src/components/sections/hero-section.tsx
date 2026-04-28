@@ -1,8 +1,8 @@
-import { HeroCodeBlock } from "@/components/landing/hero-code-block";
-import { HeroTitle } from "@/components/landing/hero-title";
 import { Section, SectionContent } from "@/components/layout/section";
 import { heroConfigCode, heroPaykitCode } from "@/components/sections/readme-code-content";
 import { CodeBlockContent } from "@/components/ui/code-block-content";
+import { HeroCodeBlock } from "@/components/web/hero-code-block";
+import { HeroTitle } from "@/components/web/hero-title";
 
 const codeBlockOverrides = {
   className:

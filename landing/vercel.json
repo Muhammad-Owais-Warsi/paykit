@@ -1,4 +1,0 @@
-{
-  "ignoreCommand": "bunx turbo-ignore landing",
-  "installCommand": "bun install"
-}

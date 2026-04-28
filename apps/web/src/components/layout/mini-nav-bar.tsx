@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-import { BrandMenu } from "@/components/landing/brand-menu";
+import { BrandMenu } from "@/components/web/brand-menu";
 
 import { DashedLine } from "./section";
 

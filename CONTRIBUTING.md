@@ -41,7 +41,7 @@ packages/
   polar/  # Polar provider
 apps/
   demo/         # Demo app
-landing/        # Next.js marketing site
+  web/          # Next.js web app
 e2e/            # End-to-end tests
 ```
 

@@ -7,9 +7,9 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Wordmark } from "@/components/icons/wordmark";
-import { BrandMenu } from "@/components/landing/brand-menu";
 import { DashedLine } from "@/components/layout/section";
 import { Button } from "@/components/ui/button";
+import { BrandMenu } from "@/components/web/brand-menu";
 import { URLs } from "@/lib/consts";
 
 // ─── Shared nav link ─────────────────────────────────────────────────

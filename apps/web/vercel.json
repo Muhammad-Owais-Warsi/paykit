@@ -1,0 +1,4 @@
+{
+  "ignoreCommand": "bunx turbo-ignore web",
+  "installCommand": "bun install"
+}

@@ -31,11 +31,11 @@ Run specific tests with `vitest /path/to/<test-file> -t <pattern>`, not `bun tes
 - **Linter**: oxlint 1.51 | **Formatter**: oxfmt 0.36 | **Validation**: Zod 4
 - **Git hooks**: simple-git-hooks + lint-staged (runs `oxlint --fix` + `oxfmt --write` on commit)
 
-### Landing Page
+### Web App
 
 - **Framework**: Next.js (App Router) | **Styling**: Tailwind CSS v4
 - **Animations**: Framer Motion | **Components**: shadcn/ui + fumadocs-ui
-- **Code highlighting**: Shiki with custom Vercel Dark theme (`landing/src/lib/shiki-vercel-theme.ts`), applied as default in `DynamicCodeBlock`
+- **Code highlighting**: Shiki with custom Vercel Dark theme (`apps/web/src/lib/shiki-vercel-theme.ts`), applied as default in `DynamicCodeBlock`
 
 ## Code Style
 

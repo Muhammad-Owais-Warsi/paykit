@@ -4,9 +4,9 @@
   <a name="readme-top"></a>
   <a href="https://paykit.sh">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="landing/public/brand/logo-dark.svg">
-      <source media="(prefers-color-scheme: light)" srcset="landing/public/brand/logo-light.svg">
-      <img alt="PayKit" src="landing/public/brand/logo-light.svg" height="120">
+      <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/brand/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="apps/web/public/brand/logo-light.svg">
+      <img alt="PayKit" src="apps/web/public/brand/logo-light.svg" height="120">
     </picture>
   </a>
 </p>

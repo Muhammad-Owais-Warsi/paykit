@@ -7,11 +7,11 @@ import { PageTransition } from "@/components/layout/page-transition";
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <CommandMenuProvider>
-      <div className="dark bg-background text-foreground relative h-dvh overflow-x-hidden">
+      <div className="dark bg-background text-foreground min-h-dvh overflow-x-hidden">
         <NavigationBar stars={null} />
-        <div className="absolute inset-0 overflow-x-hidden overflow-y-auto">
+        <main>
           <PageTransition>{children}</PageTransition>
-        </div>
+        </main>
       </div>
     </CommandMenuProvider>
   );

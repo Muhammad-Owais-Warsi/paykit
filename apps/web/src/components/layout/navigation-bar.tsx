@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Wordmark } from "@/components/icons/wordmark";
-import { DashedLine } from "@/components/layout/section";
+import { SectionShell } from "@/components/layout/section";
 import { Button } from "@/components/ui/button";
 import { BrandMenu } from "@/components/web/brand-menu";
 import { URLs } from "@/lib/consts";
@@ -109,21 +109,23 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.28, ease: "easeOut" }}
-          className="bg-background border-foreground/6 pointer-events-auto flex w-full items-center justify-between border-b lg:hidden"
+          className="bg-background border-border pointer-events-auto w-full border-b lg:hidden"
         >
-          <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
-            <Wordmark title={null} className="h-4 origin-left scale-110" />
-          </Link>
-          <button
-            type="button"
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-controls="mobile-navigation-menu"
-            aria-expanded={mobileMenuOpen}
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="text-foreground/65 dark:text-foreground/50 hover:text-foreground/80 px-5 py-3 transition-colors"
-          >
-            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
+          <SectionShell className="flex items-center justify-between">
+            <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
+              <Wordmark title={null} className="h-4 origin-left scale-110" />
+            </Link>
+            <button
+              type="button"
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-controls="mobile-navigation-menu"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="text-foreground/65 dark:text-foreground/50 hover:text-foreground/80 px-5 py-3 transition-colors"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </SectionShell>
         </motion.div>
 
         {/* Desktop */}
@@ -131,15 +133,9 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
           initial={{ y: -10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.28, delay: 0.04, ease: "easeOut" }}
-          className="bg-background pointer-events-auto relative hidden w-full items-stretch justify-center border-b lg:flex"
+          className="bg-background border-border pointer-events-auto relative hidden w-full items-stretch justify-center border-b lg:flex"
         >
-          <div className="relative mx-auto w-full max-w-[76rem]">
-            <div className="hidden min-[76rem]:block">
-              <DashedLine orientation="vertical" />
-            </div>
-            <div className="absolute top-0 right-0 hidden h-full min-[76rem]:block">
-              <DashedLine orientation="vertical" />
-            </div>
+          <SectionShell>
             <div className="flex h-12 items-center justify-between px-12">
               {/* Logo */}
               <BrandMenu />
@@ -233,7 +229,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
                 </Button>
               </div>
             </div>
-          </div>
+          </SectionShell>
         </motion.div>
       </div>
 

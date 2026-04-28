@@ -2,32 +2,36 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-// ─── Shared dashed line ──────────────────────────────────────────────
+export const sectionShellWidth =
+  "w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] md:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] xl:w-full";
 
-export function DashedLine({ orientation }: { orientation: "horizontal" | "vertical" }) {
+// ─── Shared section line ─────────────────────────────────────────────
+
+export function SectionLine({ orientation }: { orientation: "horizontal" | "vertical" }) {
   const isH = orientation === "horizontal";
   return (
-    <svg
+    <div
       className={cn(
-        "pointer-events-none absolute stroke-foreground/20",
+        "pointer-events-none absolute bg-border",
         isH ? "left-0 h-px w-full" : "top-0 h-full w-px",
       )}
-      preserveAspectRatio="none"
-    >
-      <line
-        x1="0"
-        y1="0"
-        x2={isH ? "100%" : "0"}
-        y2={isH ? "0" : "100%"}
-        stroke="inherit"
-        strokeWidth="1"
-        strokeDasharray="6 8"
-      />
-    </svg>
+    />
   );
 }
 
-// ─── Section (outer wrapper with dashed borders) ─────────────────────
+export function SectionShell({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("relative mx-auto max-w-[76rem]", sectionShellWidth, className)}>
+      <SectionLine orientation="vertical" />
+      <div className="absolute top-0 right-0 h-full">
+        <SectionLine orientation="vertical" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Section (outer wrapper with solid borders) ──────────────────────
 
 export function Section({
   children,
@@ -39,20 +43,14 @@ export function Section({
   last?: boolean;
 }) {
   return (
-    <div className={cn("relative mx-auto w-full max-w-[76rem]", className)}>
-      <div className="hidden min-[76rem]:block">
-        <DashedLine orientation="vertical" />
-      </div>
-      <div className="absolute top-0 right-0 hidden h-full min-[76rem]:block">
-        <DashedLine orientation="vertical" />
-      </div>
+    <SectionShell className={className}>
       {!last && (
-        <div className="absolute bottom-0 left-0 w-full">
-          <DashedLine orientation="horizontal" />
+        <div className="absolute bottom-0 left-1/2 w-screen -translate-x-1/2">
+          <SectionLine orientation="horizontal" />
         </div>
       )}
       {children}
-    </div>
+    </SectionShell>
   );
 }
 
@@ -68,12 +66,12 @@ export function SectionContent({
   return <div className={cn("px-5 py-8 sm:px-8 sm:py-10 lg:p-12", className)}>{children}</div>;
 }
 
-// ─── SectionSeparator (full section-width dashed line) ───────────────
+// ─── SectionSeparator (full viewport-width solid line) ───────────────
 
 export function SectionSeparator() {
   return (
-    <div className="relative h-px w-full">
-      <DashedLine orientation="horizontal" />
+    <div className="relative left-1/2 h-px w-screen -translate-x-1/2">
+      <SectionLine orientation="horizontal" />
     </div>
   );
 }

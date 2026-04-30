@@ -14,18 +14,15 @@ export default function Footer() {
         aria-hidden="true"
       >
         <svg
-          width="360"
-          height="270"
-          viewBox="0 0 60 45"
+          width="114"
+          height="123"
+          viewBox="0 0 114 123"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M0 0H15V15H30V30H15V45H0V30V15V0ZM45 30V15H30V0H45H60V15V30V45H45H30V30H45Z"
-            className="fill-foreground"
-          />
+          <path d="M0 0H67V47H0V0Z" fill="white" />
+          <path d="M67 0H114V76H67V0Z" fill="white" />
+          <path d="M0 76H67V123H0V76Z" fill="white" />
         </svg>
       </div>
 

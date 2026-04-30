@@ -113,7 +113,7 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
         >
           <SectionShell className="flex items-center justify-between">
             <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
-              <Wordmark title={null} className="h-4 origin-left scale-110" />
+              <Wordmark title={null} className="h-4 origin-left scale-95" />
             </Link>
             <button
               type="button"

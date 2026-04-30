@@ -1,9 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
 
-import { Wordmark } from "@/components/icons/wordmark";
 import { BrandMenu } from "@/components/web/brand-menu";
 
 import { SectionShell } from "./section";
@@ -18,9 +16,7 @@ export function MiniNavBar() {
         className="bg-background border-border pointer-events-auto w-full border-b lg:hidden"
       >
         <SectionShell className="flex items-center">
-          <Link href="/" aria-label="PayKit home" className="flex items-center gap-1 px-5 py-3">
-            <Wordmark title={null} className="h-4 origin-left scale-95" />
-          </Link>
+          <BrandMenu linkClassName="gap-1 px-5 py-3" wordmarkClassName="scale-95" />
         </SectionShell>
       </motion.div>
 

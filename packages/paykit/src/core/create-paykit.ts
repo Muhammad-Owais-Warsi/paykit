@@ -76,21 +76,7 @@ export function createPayKit<const TOptions extends PayKitOptions>(
 
     async handler(request: Request) {
       const ctx = await getContext();
-      const basePath = options.basePath ?? "/paykit";
-
-      // Rewrite GET /paykit/* → /paykit/api/dash (dashboard SPA)
-      // But not /paykit/api/* (those are real API routes)
-      const url = new URL(request.url);
-      if (
-        request.method === "GET" &&
-        (url.pathname === basePath || url.pathname.startsWith(`${basePath}/`)) &&
-        !url.pathname.startsWith(`${basePath}/api`)
-      ) {
-        url.pathname = `${basePath}/api/dash`;
-        request = new Request(url, request);
-      }
-
-      const router = createPayKitRouter(ctx, options);
+      const router = createPayKitRouter(ctx);
       return router.handler(request);
     },
 

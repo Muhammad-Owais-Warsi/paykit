@@ -43,7 +43,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 In the Stripe Dashboard, go to **Developers > Webhooks** and create a new endpoint pointing to:
 
 ```
-https://your-app.com/paykit/api/webhook/stripe
+https://your-app.com/paykit/webhook
 ```
 
 Select the following events when creating the endpoint:
@@ -70,7 +70,7 @@ After saving, Stripe displays the signing secret. Copy it as your `STRIPE_WEBHOO
 Use the Stripe CLI to forward webhook events to your local server:
 
 ```bash
-stripe listen --forward-to localhost:3000/paykit/api/webhook/stripe
+stripe listen --forward-to localhost:3000/paykit/webhook
 ```
 
 The CLI prints a webhook signing secret at startup. Use that as `STRIPE_WEBHOOK_SECRET` in your local `.env`.

@@ -44,7 +44,7 @@ POLAR_WEBHOOK_SECRET=...
 In the Polar Dashboard, go to **Settings > Webhooks** and create a new endpoint pointing to:
 
 ```
-https://your-app.com/paykit/api/webhook/polar
+https://your-app.com/paykit/webhook
 ```
 
 Enable the following events:
@@ -63,7 +63,7 @@ You can also select all events. PayKit silently ignores any events it doesn't ne
 Use the Polar CLI to forward webhook events to your local server:
 
 ```bash
-polar listen http://localhost:3000/paykit/api/webhook/polar
+polar listen http://localhost:3000/paykit/webhook
 ```
 
 The CLI prints a webhook signing secret at startup. Use that as `POLAR_WEBHOOK_SECRET` in your local `.env`.

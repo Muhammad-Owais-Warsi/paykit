@@ -1,5 +1,4 @@
 import { definePayKitMethod } from "../api/define-route";
-import { PayKitError, PAYKIT_ERROR_CODES } from "../core/errors";
 import { handleWebhook } from "./webhook.service";
 
 function headersToRecord(headers: Headers): Record<string, string> {
@@ -16,7 +15,7 @@ export const receiveWebhook = definePayKitMethod(
     route: {
       disableBody: true,
       method: "POST",
-      path: "/webhook/:providerId",
+      path: "/webhook",
       requireHeaders: true,
       requireRequest: true,
       resolveInput: async (ctx) => ({
@@ -25,16 +24,6 @@ export const receiveWebhook = definePayKitMethod(
       }),
     },
   },
-  async (ctx) => {
-    const providerId = ctx.params.providerId;
-    if (providerId && providerId !== ctx.paykit.provider.id) {
-      throw PayKitError.from(
-        "BAD_REQUEST",
-        PAYKIT_ERROR_CODES.PROVIDER_WEBHOOK_INVALID,
-        "Webhook provider does not match this PayKit instance",
-      );
-    }
-
-    return handleWebhook(ctx.paykit, ctx.input);
-  },
+  // TODO: if we'll add multiple providers on one app, we gotta make sure detecting provider based on request HERE
+  async (ctx) => handleWebhook(ctx.paykit, ctx.input),
 );

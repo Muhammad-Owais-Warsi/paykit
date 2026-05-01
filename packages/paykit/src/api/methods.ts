@@ -60,6 +60,37 @@ const allClientMethods = pickMethods(methods as typeof methods & MethodMap);
 
 export const clientMethods = baseClientMethods;
 
+function normalizePayKitRequest(request: Request, ctx: Pick<PayKitContext, "basePath">): Request {
+  const { basePath } = ctx;
+  const url = new URL(request.url);
+
+  // Rewrite GET /paykit/* → /paykit/dash (dashboard SPA)
+  // But not /paykit/api/* (those are real API routes)
+  if (
+    request.method === "GET" &&
+    (url.pathname === basePath || url.pathname.startsWith(`${basePath}/`)) &&
+    !url.pathname.startsWith(`${basePath}/api`)
+  ) {
+    url.pathname = `${basePath}/dash`;
+    return new Request(url, request);
+  }
+
+  const legacyWebhookPrefix = `${basePath}/api/webhook`;
+  if (url.pathname === legacyWebhookPrefix || url.pathname.startsWith(`${legacyWebhookPrefix}/`)) {
+    // Backward compatibility only: keep legacy /api webhook URLs working.
+    url.pathname = `${basePath}/webhook`;
+    return new Request(url, request);
+  }
+
+  if (url.pathname === `${basePath}/api` || url.pathname.startsWith(`${basePath}/api/`)) {
+    const strippedPath = url.pathname.slice(`${basePath}/api`.length);
+    url.pathname = `${basePath}${strippedPath}`;
+    return new Request(url, request);
+  }
+
+  return request;
+}
+
 function pickMethods<TMethods extends MethodMap>(
   source: TMethods,
 ): Pick<TMethods, ClientMethodKeys<TMethods>> {
@@ -128,13 +159,13 @@ export function getApi(
   );
 }
 
-export function createPayKitRouter(ctx: PayKitContext, options: PayKitOptions) {
+export function createPayKitRouter(ctx: PayKitContext) {
   const pluginEndpoints = Object.assign(
     {},
-    ...(options.plugins ?? []).map((plugin) => plugin.endpoints ?? {}),
+    ...(ctx.options.plugins ?? []).map((plugin) => plugin.endpoints ?? {}),
   );
   const routeEndpoints = getRouteEndpoints(
-    isTestingEnabled(options)
+    isTestingEnabled(ctx.options)
       ? (methods as typeof methods & MethodMap)
       : (baseMethods as typeof baseMethods & MethodMap),
   );
@@ -142,7 +173,10 @@ export function createPayKitRouter(ctx: PayKitContext, options: PayKitOptions) {
   return createRouter(
     { ...routeEndpoints, ...pluginEndpoints },
     {
-      basePath: options.basePath ?? "/paykit/api",
+      basePath: ctx.basePath,
+      onRequest(request) {
+        return normalizePayKitRequest(request, ctx);
+      },
       routerContext: ctx,
       onError(error) {
         ctx.logger.error({ err: error }, "API error");

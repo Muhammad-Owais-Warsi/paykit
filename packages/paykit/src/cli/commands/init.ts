@@ -475,7 +475,7 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
       `   ${c("•")} Check status: ${b(`${exec} paykitjs status`)}`,
       `   ${c("•")} Sync updated products: ${b(`${exec} paykitjs push`)}`,
       `   ${c("•")} Add AI skills: ${b(`${getDlxPrefix(pm)} skills add getpaykit/skills`)}`,
-      `   ${c("•")} Forward dev webhooks: ${b("stripe listen --forward-to localhost:3000/paykit/api/webhook/stripe")}`,
+      `   ${c("•")} Forward dev webhooks: ${b("stripe listen --forward-to localhost:3000/paykit/webhook")}`,
       "",
       `   Please star us on github ${c("<3")}`,
       `   ${c("https://paykit.sh/github")}`,

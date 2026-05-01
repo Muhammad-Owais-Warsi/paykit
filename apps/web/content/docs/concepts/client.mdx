@@ -58,13 +58,17 @@ window.location.href = url;
 
 ## Custom base URL
 
-If you changed `basePath` on your server instance, pass `baseURL` to match.
+If you changed `basePath` on your server instance, pass the PayKit root URL to the client.
 
 ```ts
 export const paykitClient = createPayKitClient<typeof paykit>({
-  baseURL: "/custom/api",
+  baseURL: "/custom",
 });
 ```
+
+The client derives its API URL automatically, so `baseURL: "/custom"` maps to `/custom/api` under the hood.
+
+You can also pass an absolute URL like `https://example.com/custom`.
 
 ## Type safety
 

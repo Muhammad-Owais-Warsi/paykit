@@ -19,6 +19,11 @@ export interface PayKitOptions {
   database: Pool | string;
   provider: PayKitProviderConfig;
   plans?: PayKitPlansModule;
+  /**
+   * PayKit root path, e.g. `/paykit` or `/billing`.
+   * API routes are exposed under `${basePath}/api` and webhooks under `${basePath}/webhook`.
+   * @default "/paykit"
+   */
   basePath?: string;
   identify?: (request: Request) => Promise<{
     customerId: string;

@@ -8,18 +8,25 @@ type RequiresIdentify = {
 };
 
 export interface PayKitClientOptions {
+  /**
+   * Should match the server `basePath`, e.g. server `/paykit` -> client `/paykit` or `https://my-server.com/paykit`.
+   * It resolves to `${baseURL}/api` under the hood, because the client only calls api.
+   * @default "/paykit"
+   */
   baseURL?: string;
 }
 
 export function createPayKitClient<Instance extends RequiresIdentify>(
   options?: PayKitClientOptions,
 ) {
-  const baseURL = options?.baseURL ?? "/paykit/api";
+  const baseUrl = (options?.baseURL ?? "/paykit").replace(/\/+$/, "");
+  const apiUrl = baseUrl === "" ? "/api" : baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
+
   const isCredentialsSupported =
     typeof globalThis.Request !== "undefined" && "credentials" in Request.prototype;
 
   const $fetch = createFetch({
-    baseURL,
+    baseURL: apiUrl,
     throw: true,
     ...(isCredentialsSupported ? { credentials: "include" as const } : {}),
   });

@@ -2,34 +2,16 @@
 
 import { toast } from "sonner";
 
+import { UsageButtons } from "@/app/_components/usage-buttons";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { featureCatalog } from "@/lib/demo-catalog";
+import type { PayKitScenario } from "@/lib/paykit-scenarios";
 import { api } from "@/trpc/react";
 
-const featureCatalog = [
-  {
-    description: "Send an AI message",
-    id: "messages",
-    name: "Messages",
-    type: "metered" as const,
-  },
-  {
-    description: "Access to advanced AI models",
-    id: "pro_models",
-    name: "Pro Models",
-    type: "boolean" as const,
-  },
-  {
-    description: "Dedicated priority support channel",
-    id: "priority_support",
-    name: "Priority Support",
-    type: "boolean" as const,
-  },
-];
-
 function MeteredFeatureRow({
+  scenario,
   featureId,
   name,
   description,
@@ -37,15 +19,18 @@ function MeteredFeatureRow({
   description: string;
   featureId: string;
   name: string;
+  scenario: PayKitScenario;
 }) {
   const utils = api.useUtils();
-  const { data, isLoading } = api.paykit.checkFeature.useQuery({
+  const paykitApi = scenario === "polar" ? api.paykitPolar : api.paykitStripe;
+  const paykitUtils = scenario === "polar" ? utils.paykitPolar : utils.paykitStripe;
+  const { data, isLoading } = paykitApi.checkFeature.useQuery({
     featureId,
   });
 
-  const report = api.paykit.reportUsage.useMutation({
+  const report = paykitApi.reportUsage.useMutation({
     onSuccess: (result) => {
-      void utils.paykit.checkFeature.invalidate({ featureId });
+      void paykitUtils.checkFeature.invalidate({ featureId });
       if (!result.success) {
         toast.error("Insufficient balance", {
           description: `Not enough ${name.toLowerCase()} remaining`,
@@ -82,38 +67,18 @@ function MeteredFeatureRow({
       ) : null}
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-xs">{description}</p>
-        <div className="flex gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={report.isPending || !data?.allowed}
-            onClick={() => report.mutate({ featureId, amount: 1 })}
-          >
-            +1
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={report.isPending || !data?.allowed}
-            onClick={() => report.mutate({ featureId, amount: 10 })}
-          >
-            +10
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={report.isPending || !data?.allowed}
-            onClick={() => report.mutate({ featureId, amount: 100 })}
-          >
-            +100
-          </Button>
-        </div>
+        <UsageButtons
+          disabled={!data?.allowed}
+          isPending={report.isPending}
+          onTrack={(amount) => report.mutate({ featureId, amount })}
+        />
       </div>
     </div>
   );
 }
 
 function BooleanFeatureRow({
+  scenario,
   featureId,
   name,
   description,
@@ -121,8 +86,10 @@ function BooleanFeatureRow({
   description: string;
   featureId: string;
   name: string;
+  scenario: PayKitScenario;
 }) {
-  const { data, isLoading } = api.paykit.checkFeature.useQuery({
+  const paykitApi = scenario === "polar" ? api.paykitPolar : api.paykitStripe;
+  const { data, isLoading } = paykitApi.checkFeature.useQuery({
     featureId,
   });
 
@@ -143,13 +110,14 @@ function BooleanFeatureRow({
   );
 }
 
-export function FeaturesPanel() {
+export function FeaturesPanel({ scenario }: { scenario: PayKitScenario }) {
   return (
     <div className="flex flex-col gap-4">
       {featureCatalog.map((feat) =>
         feat.type === "metered" ? (
           <MeteredFeatureRow
             key={feat.id}
+            scenario={scenario}
             featureId={feat.id}
             name={feat.name}
             description={feat.description}
@@ -157,6 +125,7 @@ export function FeaturesPanel() {
         ) : (
           <BooleanFeatureRow
             key={feat.id}
+            scenario={scenario}
             featureId={feat.id}
             name={feat.name}
             description={feat.description}

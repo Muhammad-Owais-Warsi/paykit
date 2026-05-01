@@ -6,8 +6,11 @@ import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
 const config = {
-  transpilePackages: ["paykitjs", "@paykitjs/stripe", "autumn-js"],
+  transpilePackages: ["paykitjs", "@paykitjs/polar", "@paykitjs/stripe", "autumn-js"],
   serverExternalPackages: ["pg"],
+  turbopack: {
+    root: new URL("../..", import.meta.url).pathname,
+  },
 };
 
 export default config;

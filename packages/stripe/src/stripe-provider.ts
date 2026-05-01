@@ -24,6 +24,10 @@ export interface StripeOptions {
   managedPayments?: boolean;
 }
 
+export type StripeProviderConfig = PayKitProviderConfig & {
+  capabilities: { testClocks: true };
+};
+
 type StripeInvoiceWithExtras = StripeSdk.Invoice & {
   payment_intent?: StripeSdk.PaymentIntent | string | null;
   subscription?: StripeSdk.Subscription | string | null;
@@ -535,6 +539,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
   return {
     id: "stripe",
     name: "Stripe",
+    capabilities: { testClocks: true },
 
     async createCustomer(data) {
       let testClock: ProviderTestClock | undefined;
@@ -966,7 +971,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
   };
 }
 
-export function stripe(options: StripeOptions): PayKitProviderConfig {
+export function stripe(options: StripeOptions): StripeProviderConfig {
   const apiVersion = options.apiVersion ?? PAYKIT_STRIPE_API_VERSION;
   if (options.managedPayments) {
     if (!apiVersion.endsWith(".preview") || apiVersion < STRIPE_MANAGED_PAYMENTS_MIN_VERSION) {
@@ -985,6 +990,7 @@ export function stripe(options: StripeOptions): PayKitProviderConfig {
   return {
     id: "stripe",
     name: "Stripe",
+    capabilities: { testClocks: true },
     createAdapter(): PaymentProvider {
       return createStripeProvider(client, options);
     },

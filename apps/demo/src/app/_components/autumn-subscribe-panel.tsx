@@ -3,37 +3,12 @@
 import { useCustomer, useListPlans } from "autumn-js/react";
 import { useState } from "react";
 
+import { PlanCard } from "@/app/_components/plan-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const planCatalog = [
-  {
-    description: "100 messages / month",
-    id: "free",
-    name: "Free",
-    priceAmount: null,
-  },
-  {
-    description: "2,000 messages, pro models",
-    id: "pro",
-    name: "Pro",
-    priceAmount: 1900,
-  },
-  {
-    description: "10,000 messages, priority support",
-    id: "ultra",
-    name: "Ultra",
-    priceAmount: 4900,
-  },
-] as const;
-
-function formatPrice(amount: number | null) {
-  if (amount == null) return "$0";
-  return `$${(amount / 100).toFixed(0)}`;
-}
+import { planCatalog } from "@/lib/demo-catalog";
 
 function formatDate(ts: number | null) {
   if (ts == null) return null;
@@ -172,32 +147,14 @@ export function AutumnSubscribePanel() {
             const action = getPlanAction(plan.id);
 
             return (
-              <Card key={plan.id} size="sm">
-                <CardHeader>
-                  <CardTitle className="flex items-baseline gap-2">
-                    {plan.name}
-                    {isCurrent ? <Badge variant="secondary">current</Badge> : null}
-                  </CardTitle>
-                  <CardDescription>
-                    <span className="text-foreground text-2xl font-semibold">
-                      {formatPrice(plan.priceAmount)}
-                    </span>
-                    /mo
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-3">
-                  <p className="text-muted-foreground flex-1 text-sm">{plan.description}</p>
-                  <Button
-                    className="w-full"
-                    disabled={isPending || action.disabled}
-                    onClick={() => void handleSubscribe(plan.id)}
-                    variant={action.disabled ? "outline" : "default"}
-                    size="sm"
-                  >
-                    {action.label}
-                  </Button>
-                </CardContent>
-              </Card>
+              <PlanCard
+                key={plan.id}
+                action={action}
+                isCurrent={isCurrent}
+                isPending={isPending}
+                onSelect={() => void handleSubscribe(plan.id)}
+                plan={plan}
+              />
             );
           })}
         </div>

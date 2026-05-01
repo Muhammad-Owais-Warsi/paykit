@@ -10,6 +10,10 @@ export interface PolarOptions {
   server?: "production" | "sandbox";
 }
 
+export type PolarProviderConfig = PayKitProviderConfig & {
+  capabilities: { testClocks: false };
+};
+
 type PolarWebhookEvent = ReturnType<typeof validateEvent>;
 type PolarSubscriptionEvent = Extract<PolarWebhookEvent, { type?: `subscription.${string}` }>;
 type PolarCheckoutEvent = Extract<PolarWebhookEvent, { type?: `checkout.${string}` }>;
@@ -121,6 +125,7 @@ export function createPolarProvider(client: Polar, options: PolarOptions): Payme
   return {
     id: "polar",
     name: "Polar",
+    capabilities: { testClocks: false },
 
     async createCustomer(data) {
       if (!data.email) {
@@ -541,10 +546,11 @@ export function createPolarProvider(client: Polar, options: PolarOptions): Payme
   };
 }
 
-export function polar(polarOptions: PolarOptions): PayKitProviderConfig {
+export function polar(polarOptions: PolarOptions): PolarProviderConfig {
   return {
     id: "polar",
     name: "Polar",
+    capabilities: { testClocks: false },
     createAdapter(): PaymentProvider {
       const client = new Polar({
         accessToken: polarOptions.accessToken,

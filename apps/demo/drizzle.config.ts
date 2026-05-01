@@ -5,7 +5,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "../../packages/paykit/src/database/schema.ts",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    url: process.env.POLAR_DATABASE_URL!,
   },
   migrations: {
     schema: "public",

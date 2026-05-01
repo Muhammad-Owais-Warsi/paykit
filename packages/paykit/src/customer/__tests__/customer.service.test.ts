@@ -112,6 +112,7 @@ describe("customer/service", () => {
       },
       plans: { plans: [] },
       provider: {
+        capabilities: { testClocks: true },
         id: "stripe",
         name: "Stripe",
         ...stripe,
@@ -207,6 +208,7 @@ describe("customer/service", () => {
       },
       plans: { plans: [] },
       provider: {
+        capabilities: { testClocks: true },
         id: "stripe",
         name: "Stripe",
         ...stripe,

@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { auth } from "@/lib/auth";
+import { getAutumn } from "@/lib/autumn";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
-import { auth } from "@/server/auth";
-import { autumn } from "@/server/autumn";
 
 export const autumnRouter = createTRPCRouter({
   trackUsage: publicProcedure
@@ -12,6 +12,10 @@ export const autumnRouter = createTRPCRouter({
       const session = await auth.api.getSession({ headers: ctx.headers });
       if (!session) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      const autumn = getAutumn();
+      if (!autumn) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Autumn is not configured" });
       }
       const result = await autumn.track({
         customerId: session.user.id,

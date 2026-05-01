@@ -3,50 +3,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { PlanCard } from "@/app/_components/plan-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PayKit } from "@/lib/paykit";
-import { paykitClient } from "@/lib/paykit-client";
+import { planCatalog, type PlanId } from "@/lib/demo-catalog";
+import { paykitPolarClient, paykitStripeClient } from "@/lib/paykit-client";
+import type { PayKitScenario } from "@/lib/paykit-scenarios";
 import { api, type RouterOutputs } from "@/trpc/react";
 
-type SubscribePlanId = PayKit["planId"];
-type CurrentPlan = RouterOutputs["paykit"]["currentPlans"][number];
+type CurrentPlan = RouterOutputs["paykitPolar"]["currentPlans"][number];
 
-const testClockQueryKey = ["paykit", "test-clock"] as const;
-
-const planCatalog = [
-  {
-    description: "100 messages / month",
-    id: "free",
-    name: "Free",
-    priceAmount: null,
-  },
-  {
-    description: "2,000 messages, pro models",
-    id: "pro",
-    name: "Pro",
-    priceAmount: 1900,
-  },
-  {
-    description: "10,000 messages, priority support",
-    id: "ultra",
-    name: "Ultra",
-    priceAmount: 4900,
-  },
-] as const satisfies ReadonlyArray<{
-  description: string;
-  id: SubscribePlanId;
-  name: string;
-  priceAmount: number | null;
-}>;
-
-function formatPrice(amount: number | null) {
-  if (amount == null) return "$0";
-  return `$${(amount / 100).toFixed(0)}`;
-}
+const stripeTestClockQueryKey = ["paykit", "stripe", "test-clock"] as const;
 
 function formatDate(date: Date | string) {
   return new Date(date).toLocaleDateString(undefined, {
@@ -81,7 +51,7 @@ function advanceClockTime(date: Date | string, input: { days?: number; months?: 
 }
 
 function getPlanAction(
-  planId: SubscribePlanId,
+  planId: PlanId,
   activePlan: CurrentPlan | null,
   scheduledPlan: CurrentPlan | null,
 ) {
@@ -115,17 +85,49 @@ function getPlanAction(
   return { disabled: false, label: "Switch" };
 }
 
-function TestClockPanel() {
+function TestClockUnsupportedPanel() {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Test clock
+          <Badge variant="secondary">Not supported</Badge>
+        </CardTitle>
+        <CardDescription>
+          This provider does not support test clocks, so billing time cannot be advanced in the
+          demo.
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function TestClockLoadingPanel() {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>Test clock</CardTitle>
+        <CardDescription>Checking provider support.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-9 w-full" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function StripeTestClockPanel() {
   const utils = api.useUtils();
   const queryClient = useQueryClient();
   const testClock = useQuery({
-    queryFn: async () => paykitClient.getTestClock({}),
-    queryKey: testClockQueryKey,
+    queryFn: async () => paykitStripeClient.getTestClock({}),
+    queryKey: stripeTestClockQueryKey,
   });
 
   const advanceClock = useMutation({
     mutationFn: async (frozenTime: Date) => {
-      const result = await paykitClient.advanceTestClock({ frozenTime });
+      const result = await paykitStripeClient.advanceTestClock({ frozenTime });
       return result;
     },
     onError: (error) => {
@@ -134,9 +136,9 @@ function TestClockPanel() {
     onSuccess: async () => {
       toast.success("Advanced test clock");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: testClockQueryKey }),
-        utils.paykit.currentPlans.invalidate(),
-        utils.paykit.checkFeature.invalidate(),
+        queryClient.invalidateQueries({ queryKey: stripeTestClockQueryKey }),
+        utils.paykitStripe.currentPlans.invalidate(),
+        utils.paykitStripe.checkFeature.invalidate(),
       ]);
     },
   });
@@ -215,9 +217,13 @@ function TestClockPanel() {
   );
 }
 
-export function SubscribePanel() {
+export function SubscribePanel({ scenario }: { scenario: PayKitScenario }) {
   const utils = api.useUtils();
-  const { data: currentPlans, isLoading: isLoadingPlans } = api.paykit.currentPlans.useQuery();
+  const paykitApi = scenario === "polar" ? api.paykitPolar : api.paykitStripe;
+  const paykitUtils = scenario === "polar" ? utils.paykitPolar : utils.paykitStripe;
+  const paykitClient = scenario === "polar" ? paykitPolarClient : paykitStripeClient;
+  const capabilities = paykitApi.capabilities.useQuery();
+  const { data: currentPlans, isLoading: isLoadingPlans } = paykitApi.currentPlans.useQuery();
   const activePlan =
     currentPlans?.find((plan) => ["active", "trialing", "past_due"].includes(plan.status)) ?? null;
   const scheduledPlan = currentPlans?.find((plan) => plan.status === "scheduled") ?? null;
@@ -235,17 +241,17 @@ export function SubscribePanel() {
   });
 
   const subscribe = useMutation({
-    mutationFn: async ({ planId }: { planId: SubscribePlanId }) => {
+    mutationFn: async ({ planId }: { planId: PlanId }) => {
       const result = await paykitClient.subscribe({
         planId,
-        successUrl: `/?checkout=success`,
-        cancelUrl: `/?checkout=canceled`,
+        successUrl: `/?tab=paykit-${scenario}&checkout=success`,
+        cancelUrl: `/?tab=paykit-${scenario}&checkout=canceled`,
       });
       return { planId, result };
     },
     onSuccess: async ({ result }) => {
       if (!result.paymentUrl) {
-        await utils.paykit.currentPlans.invalidate();
+        await paykitUtils.currentPlans.invalidate();
       }
       if (result.paymentUrl) {
         window.location.assign(result.paymentUrl);
@@ -312,7 +318,13 @@ export function SubscribePanel() {
         )}
       </section>
 
-      <TestClockPanel />
+      {capabilities.isLoading ? (
+        <TestClockLoadingPanel />
+      ) : capabilities.data?.testClocks && scenario === "stripe" ? (
+        <StripeTestClockPanel />
+      ) : (
+        <TestClockUnsupportedPanel />
+      )}
 
       <Separator />
 
@@ -325,32 +337,14 @@ export function SubscribePanel() {
             const action = getPlanAction(plan.id, activePlan, scheduledPlan);
 
             return (
-              <Card key={plan.id} size="sm">
-                <CardHeader>
-                  <CardTitle className="flex items-baseline gap-2">
-                    {plan.name}
-                    {isCurrent ? <Badge variant="secondary">current</Badge> : null}
-                  </CardTitle>
-                  <CardDescription>
-                    <span className="text-foreground text-2xl font-semibold">
-                      {formatPrice(plan.priceAmount)}
-                    </span>
-                    /mo
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-3">
-                  <p className="text-muted-foreground flex-1 text-sm">{plan.description}</p>
-                  <Button
-                    className="w-full"
-                    disabled={subscribe.isPending || action.disabled}
-                    onClick={() => subscribe.mutate({ planId: plan.id })}
-                    variant={action.disabled ? "outline" : "default"}
-                    size="sm"
-                  >
-                    {action.label}
-                  </Button>
-                </CardContent>
-              </Card>
+              <PlanCard
+                key={plan.id}
+                action={action}
+                isCurrent={isCurrent}
+                isPending={subscribe.isPending}
+                onSelect={() => subscribe.mutate({ planId: plan.id })}
+                plan={plan}
+              />
             );
           })}
         </div>

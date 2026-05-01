@@ -109,19 +109,23 @@ function isTestingEnabled(options: Pick<PayKitOptions, "testing">): boolean {
   return options.testing?.enabled === true;
 }
 
+function isTestingAvailable(options: Pick<PayKitOptions, "provider" | "testing">): boolean {
+  return isTestingEnabled(options) && options.provider.capabilities.testClocks;
+}
+
 export function getClientApi(
   ctx: PayKitContext | Promise<PayKitContext>,
-  options: Pick<PayKitOptions, "testing">,
+  options: Pick<PayKitOptions, "provider" | "testing">,
 ) {
-  return wrapMethods(isTestingEnabled(options) ? allClientMethods : baseClientMethods, ctx);
+  return wrapMethods(isTestingAvailable(options) ? allClientMethods : baseClientMethods, ctx);
 }
 
 export function getApi(
   ctx: PayKitContext | Promise<PayKitContext>,
-  options: Pick<PayKitOptions, "testing">,
+  options: Pick<PayKitOptions, "provider" | "testing">,
 ) {
   return wrapMethods(
-    isTestingEnabled(options)
+    isTestingAvailable(options)
       ? (methods as typeof methods & MethodMap)
       : (baseMethods as typeof baseMethods & MethodMap),
     ctx,
@@ -134,7 +138,7 @@ export function createPayKitRouter(ctx: PayKitContext, options: PayKitOptions) {
     ...(options.plugins ?? []).map((plugin) => plugin.endpoints ?? {}),
   );
   const routeEndpoints = getRouteEndpoints(
-    isTestingEnabled(options)
+    isTestingAvailable(options)
       ? (methods as typeof methods & MethodMap)
       : (baseMethods as typeof baseMethods & MethodMap),
   );

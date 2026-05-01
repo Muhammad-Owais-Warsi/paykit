@@ -158,8 +158,17 @@ type TestingEnabled<TOptions extends PayKitOptions> = TOptions["testing"] extend
   ? true
   : false;
 
+type TestClocksSupported<TOptions extends PayKitOptions> = TOptions["provider"] extends {
+  capabilities: { testClocks: true };
+}
+  ? true
+  : false;
+
+type TestingAvailable<TOptions extends PayKitOptions> =
+  TestingEnabled<TOptions> extends true ? TestClocksSupported<TOptions> : false;
+
 type EnabledMethodKeys<TOptions extends PayKitOptions> =
-  TestingEnabled<TOptions> extends true
+  TestingAvailable<TOptions> extends true
     ? RegisteredMethodKey
     : Exclude<RegisteredMethodKey, RegisteredTestingMethodKey>;
 
@@ -168,7 +177,7 @@ type ClientMethodKeys = {
 }[RegisteredMethodKey];
 
 type EnabledClientMethodKeys<TOptions extends PayKitOptions> =
-  TestingEnabled<TOptions> extends true
+  TestingAvailable<TOptions> extends true
     ? ClientMethodKeys
     : Exclude<ClientMethodKeys, RegisteredTestingMethodKey>;
 

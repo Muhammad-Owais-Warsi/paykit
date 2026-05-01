@@ -7,13 +7,15 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
-    APP_URL: z.string().url(),
-    DATABASE_URL: z.string().min(1),
+    APP_URL: z.url(),
+    AUTH_DATABASE_URL: z.string().min(1),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    POLAR_DATABASE_URL: z.string().min(1).optional(),
+    POLAR_ACCESS_TOKEN: z.string().min(1).optional(),
+    POLAR_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_DATABASE_URL: z.string().min(1).optional(),
     STRIPE_SECRET_KEY: z.string().min(1).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
-    POLAR_ACCESS_TOKEN: z.string().min(1),
-    POLAR_WEBHOOK_SECRET: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(1),
     AUTUMN_SECRET_KEY: z.string().min(1).optional(),
   },
@@ -33,12 +35,14 @@ export const env = createEnv({
    */
   runtimeEnv: {
     APP_URL: process.env.APP_URL,
-    DATABASE_URL: process.env.DATABASE_URL,
+    AUTH_DATABASE_URL: process.env.AUTH_DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    POLAR_DATABASE_URL: process.env.POLAR_DATABASE_URL,
     POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
     POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET,
+    STRIPE_DATABASE_URL: process.env.STRIPE_DATABASE_URL,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,

@@ -27,6 +27,10 @@ export interface ProviderPaymentMethod {
   isDefault?: boolean;
 }
 
+export interface PayKitProviderCapabilities {
+  testClocks: boolean;
+}
+
 export interface ProviderInvoice {
   currency: string;
   hostedUrl?: string | null;
@@ -65,6 +69,7 @@ export interface ProviderSubscriptionResult {
 export interface PaymentProvider {
   readonly id: string;
   readonly name: string;
+  readonly capabilities: PayKitProviderCapabilities;
 
   createCustomer(data: {
     createTestClock?: boolean;
@@ -178,5 +183,6 @@ export interface PaymentProvider {
 export interface PayKitProviderConfig {
   id: string;
   name: string;
+  capabilities: PayKitProviderCapabilities;
   createAdapter(): PaymentProvider;
 }

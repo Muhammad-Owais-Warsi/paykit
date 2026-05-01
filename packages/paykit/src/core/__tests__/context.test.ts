@@ -33,6 +33,7 @@ describe("core/context", () => {
     const database = {} as Pool;
     const adapter = { id: "test", name: "Test" } as unknown as PaymentProvider;
     const provider: PayKitProviderConfig = {
+      capabilities: { testClocks: false },
       id: "test",
       name: "Test",
       createAdapter: () => adapter,

@@ -401,7 +401,8 @@ export async function upsertProviderCustomer(
     providerCustomer = { ...existingProviderCustomer!, id: existingProviderCustomerId };
   } else {
     const result = await ctx.provider.createCustomer({
-      createTestClock: ctx.options.testing?.enabled === true,
+      createTestClock:
+        ctx.options.testing?.enabled === true && ctx.provider.capabilities.testClocks,
       id: existingCustomer.id,
       email: existingCustomer.email ?? undefined,
       name: existingCustomer.name ?? undefined,

@@ -1,31 +1,47 @@
 import { TRPCError } from "@trpc/server";
+import type { CheckResult, CustomerWithDetails, PayKitOptions, ReportResult } from "paykitjs";
 import { z } from "zod";
 
-import { paykit } from "@/lib/paykit";
-import type { PayKit } from "@/lib/paykit";
+import { auth } from "@/lib/auth";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
-import { auth } from "@/server/auth";
 
-export const paykitRouter = createTRPCRouter({
-  createCustomer: publicProcedure.mutation(async ({ ctx }) => {
-    const session = await auth.api.getSession({ headers: ctx.headers });
-    if (!session) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
+type DemoPayKit<TFeatureId extends string> = {
+  $infer: { featureId: TFeatureId };
+  options: Pick<PayKitOptions, "provider">;
+  check(input: {
+    customerId: string;
+    featureId: TFeatureId;
+    required?: number;
+  }): Promise<CheckResult>;
+  deleteCustomer(input: { id: string }): Promise<unknown>;
+  getCustomer(input: { id: string }): Promise<CustomerWithDetails | null>;
+  report(input: {
+    amount?: number;
+    customerId: string;
+    featureId: TFeatureId;
+  }): Promise<ReportResult>;
+  upsertCustomer(input: { email?: string; id: string; name?: string }): Promise<unknown>;
+};
+
+export function createPaykitRouter<const TFeatureId extends string>(
+  getPaykit: () => DemoPayKit<TFeatureId> | null,
+) {
+  function requirePaykit() {
+    const paykit = getPaykit();
+    if (!paykit) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "PayKit provider is not configured" });
     }
+    return paykit;
+  }
 
-    return paykit.upsertCustomer({
-      email: session.user.email,
-      id: session.user.id,
-      name: session.user.name ?? undefined,
-    });
-  }),
+  return createTRPCRouter({
+    capabilities: publicProcedure.query(() => {
+      const paykit = getPaykit();
+      return paykit?.options.provider.capabilities ?? { testClocks: false };
+    }),
 
-  deleteCustomer: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    createCustomer: publicProcedure.mutation(async ({ ctx }) => {
+      const paykit = requirePaykit();
       const session = await auth.api.getSession({ headers: ctx.headers });
       if (!session) {
         throw new TRPCError({
@@ -34,52 +50,75 @@ export const paykitRouter = createTRPCRouter({
         });
       }
 
-      return paykit.deleteCustomer({ id: input.id });
+      return paykit.upsertCustomer({
+        email: session.user.email,
+        id: session.user.id,
+        name: session.user.name ?? undefined,
+      });
     }),
 
-  currentPlans: publicProcedure.query(async ({ ctx }) => {
-    const session = await auth.api.getSession({ headers: ctx.headers });
-    if (!session) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
+    deleteCustomer: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const paykit = requirePaykit();
+        const session = await auth.api.getSession({ headers: ctx.headers });
+        if (!session) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Not authenticated",
+          });
+        }
 
-    await paykit.upsertCustomer({
-      email: session.user.email,
-      id: session.user.id,
-      name: session.user.name ?? undefined,
-    });
+        return paykit.deleteCustomer({ id: input.id });
+      }),
 
-    const customer = await paykit.getCustomer({ id: session.user.id });
-    return customer?.subscriptions ?? [];
-  }),
-
-  checkFeature: publicProcedure
-    .input(z.object({ featureId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    currentPlans: publicProcedure.query(async ({ ctx }) => {
+      const paykit = requirePaykit();
       const session = await auth.api.getSession({ headers: ctx.headers });
       if (!session) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Not authenticated",
+        });
       }
-      return paykit.check({
-        customerId: session.user.id,
-        featureId: input.featureId as PayKit["featureId"],
+
+      await paykit.upsertCustomer({
+        email: session.user.email,
+        id: session.user.id,
+        name: session.user.name ?? undefined,
       });
+
+      const customer = await paykit.getCustomer({ id: session.user.id });
+      return customer?.subscriptions ?? [];
     }),
 
-  reportUsage: publicProcedure
-    .input(z.object({ amount: z.number().int().min(1).optional(), featureId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const session = await auth.api.getSession({ headers: ctx.headers });
-      if (!session) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-      return paykit.report({
-        amount: input.amount,
-        customerId: session.user.id,
-        featureId: input.featureId as PayKit["featureId"],
-      });
-    }),
-});
+    checkFeature: publicProcedure
+      .input(z.object({ featureId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const paykit = requirePaykit();
+        const session = await auth.api.getSession({ headers: ctx.headers });
+        if (!session) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        return paykit.check({
+          customerId: session.user.id,
+          featureId: input.featureId as TFeatureId,
+        });
+      }),
+
+    reportUsage: publicProcedure
+      .input(z.object({ amount: z.number().int().min(1).optional(), featureId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const paykit = requirePaykit();
+        const session = await auth.api.getSession({ headers: ctx.headers });
+        if (!session) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+        return paykit.report({
+          amount: input.amount,
+          customerId: session.user.id,
+          featureId: input.featureId as TFeatureId,
+        });
+      }),
+  });
+}

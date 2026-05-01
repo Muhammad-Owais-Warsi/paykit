@@ -3,32 +3,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCustomer } from "autumn-js/react";
 
+import { UsageButtons } from "@/app/_components/usage-buttons";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { featureCatalog } from "@/lib/demo-catalog";
 import { api } from "@/trpc/react";
-
-const featureCatalog = [
-  {
-    description: "Send an AI message",
-    id: "messages",
-    name: "Messages",
-    type: "metered" as const,
-  },
-  {
-    description: "Access to advanced AI models",
-    id: "pro_models",
-    name: "Pro Models",
-    type: "boolean" as const,
-  },
-  {
-    description: "Dedicated priority support channel",
-    id: "priority_support",
-    name: "Priority Support",
-    type: "boolean" as const,
-  },
-];
 
 function MeteredFeatureRow({
   featureId,
@@ -71,32 +51,11 @@ function MeteredFeatureRow({
       {balance && !balance.unlimited ? <Progress value={percentage} className="h-1.5" /> : null}
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-xs">{description}</p>
-        <div className="flex gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isTracking || !result.allowed}
-            onClick={() => onTrack(featureId, 1)}
-          >
-            +1
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isTracking || !result.allowed}
-            onClick={() => onTrack(featureId, 10)}
-          >
-            +10
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isTracking || !result.allowed}
-            onClick={() => onTrack(featureId, 100)}
-          >
-            +100
-          </Button>
-        </div>
+        <UsageButtons
+          disabled={!result.allowed}
+          isPending={isTracking}
+          onTrack={(amount) => onTrack(featureId, amount)}
+        />
       </div>
     </div>
   );

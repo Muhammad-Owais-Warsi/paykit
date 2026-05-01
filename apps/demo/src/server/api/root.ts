@@ -1,7 +1,10 @@
+import { getPaykitPolar } from "@/lib/paykit/polar";
+import { getPaykitStripe } from "@/lib/paykit/stripe";
+import { getConfiguredScenarios } from "@/lib/scenario-config";
 import { autumnRouter } from "@/server/api/routers/autumn";
-import { paykitRouter } from "@/server/api/routers/paykit-route";
+import { createPaykitRouter } from "@/server/api/routers/paykit-route";
 import { postRouter } from "@/server/api/routers/post";
-import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
+import { createCallerFactory, createTRPCRouter, publicProcedure } from "@/server/api/trpc";
 
 /**
  * This is the primary router for your server.
@@ -10,8 +13,12 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   autumn: autumnRouter,
-  paykit: paykitRouter,
+  paykitPolar: createPaykitRouter(getPaykitPolar),
+  paykitStripe: createPaykitRouter(getPaykitStripe),
   post: postRouter,
+  scenarios: createTRPCRouter({
+    list: publicProcedure.query(() => getConfiguredScenarios()),
+  }),
 });
 
 // export type definition of API

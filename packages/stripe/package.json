@@ -1,6 +1,6 @@
 {
   "name": "@paykitjs/stripe",
-  "version": "0.0.4-canary.1",
+  "version": "0.0.4-canary.2",
   "description": "Stripe provider adapter for PayKit",
   "license": "MIT",
   "repository": {

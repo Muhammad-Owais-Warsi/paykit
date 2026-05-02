@@ -121,25 +121,28 @@ function detectExistingProductsModule(content: string): string[] | null {
 
   return reExportList
     .split(",")
-    .map((part) =>
-      part
+    .map((part) => {
+      const aliases = part
         .trim()
-        .split(/\s+as\s+/i)[0]
-        ?.trim(),
-    )
+        .split(/\s+as\s+/i)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      return aliases[1] ?? aliases[0] ?? "";
+    })
     .filter((part): part is string => Boolean(part));
 }
 
 function generateConfigFileFromProductsModule(
   productNames: string[],
   includeIdentify: boolean,
+  productsImportPath = "./paykit-products",
 ): string {
   const uniqueProductNames = Array.from(new Set(productNames));
   const productsLine = uniqueProductNames.length
     ? `\n  products: [${uniqueProductNames.join(", ")}],`
     : "\n  products: [],";
   const importLine = uniqueProductNames.length
-    ? `\nimport { ${uniqueProductNames.join(", ")} } from "./paykit-products";`
+    ? `\nimport { ${uniqueProductNames.join(", ")} } from "${productsImportPath}";`
     : "";
 
   const identifyBlock = includeIdentify
@@ -434,12 +437,30 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
 
   const productsPath = configPath.replace(/paykit(\.config)?\.ts$/, "paykit-products.ts");
   const productsFullPath = path.join(cwd, productsPath);
+  const legacyProductsPath = configPath.replace(/paykit(\.config)?\.ts$/, "paykit-plans.ts");
+  const legacyProductsFullPath = path.join(cwd, legacyProductsPath);
   let templateId: string | symbol = "saas-starter";
-  const existingProductsModule = fs.existsSync(productsFullPath)
+  const hasProductsModule = fs.existsSync(productsFullPath);
+  const hasLegacyProductsModule = fs.existsSync(legacyProductsFullPath);
+  const existingProductsModule = hasProductsModule
     ? detectExistingProductsModule(fs.readFileSync(productsFullPath, "utf8"))
-    : null;
+    : hasLegacyProductsModule
+      ? detectExistingProductsModule(fs.readFileSync(legacyProductsFullPath, "utf8"))
+      : null;
+  const existingProductsImportPath = hasProductsModule
+    ? "./paykit-products"
+    : hasLegacyProductsModule
+      ? "./paykit-plans"
+      : "./paykit-products";
 
-  if (!fs.existsSync(productsFullPath) && !useDefaults) {
+  if ((hasProductsModule || hasLegacyProductsModule) && existingProductsModule === null) {
+    p.cancel(
+      `Could not parse ${hasProductsModule ? productsPath : legacyProductsPath}. Update the module exports or regenerate it before running init again.`,
+    );
+    process.exit(1);
+  }
+
+  if (!hasProductsModule && !hasLegacyProductsModule && !useDefaults) {
     templateId = await p.select({
       message: "Select pricing template",
       options: templates.map((t) => ({
@@ -479,17 +500,21 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
   const files: FileToWrite[] = [];
 
   // Config
-  if (!existingConfig) {
+  if (!existingConfig || hasLegacyProductsModule) {
     files.push({
       path: configPath,
       content: existingProductsModule
-        ? generateConfigFileFromProductsModule(existingProductsModule, clientPath !== null)
+        ? generateConfigFileFromProductsModule(
+            existingProductsModule,
+            clientPath !== null,
+            existingProductsImportPath,
+          )
         : generateConfigFile(templateId as string, clientPath !== null),
     });
   }
 
   // Plans
-  if (!fs.existsSync(productsFullPath)) {
+  if (!hasProductsModule && !hasLegacyProductsModule) {
     const template = templates.find((t) => t.id === templateId);
     if (template) {
       files.push({ path: productsPath, content: template.content });

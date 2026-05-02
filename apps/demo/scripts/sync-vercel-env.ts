@@ -53,7 +53,9 @@ function runVercel(args: string[], input?: string): void {
     if (
       args[0] === "env" &&
       args[1] === "rm" &&
-      /(not found|does not exist|could not find|missing)/i.test(output)
+      /(not found|does not exist|could not find|missing\s+(env|environment|environment variable|variable))/i.test(
+        output,
+      )
     ) {
       return;
     }

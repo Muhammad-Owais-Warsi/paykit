@@ -37,11 +37,27 @@ function runVercel(args: string[], input?: string): void {
       VERCEL_PROJECT_ID: config.projectId,
     },
     input,
-    stdio: input == null ? "inherit" : ["pipe", "inherit", "inherit"],
+    stdio: "pipe",
   });
 
+  if (result.stdout) {
+    process.stdout.write(result.stdout);
+  }
+
+  if (result.stderr) {
+    process.stderr.write(result.stderr);
+  }
+
   if (result.status !== 0) {
-    throw new Error(`vercel ${args.join(" ")} failed`);
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    if (
+      args[0] === "env" &&
+      args[1] === "rm" &&
+      /(not found|does not exist|could not find|missing)/i.test(output)
+    ) {
+      return;
+    }
+    throw new Error(`vercel ${args.join(" ")} failed\n${output.trim()}`);
   }
 }
 
@@ -49,15 +65,7 @@ console.log(`Syncing ${config.envFile} to ${config.projectName}`);
 
 for (const [key, value] of Object.entries(values)) {
   console.log(`Updating ${key}`);
-  spawnSync("bunx", ["vercel", "env", "rm", key, "production", "--yes"], {
-    cwd: demoDir,
-    env: {
-      ...process.env,
-      VERCEL_ORG_ID,
-      VERCEL_PROJECT_ID: config.projectId,
-    },
-    stdio: "ignore",
-  });
+  runVercel(["env", "rm", key, "production", "--yes"]);
   runVercel(["env", "add", key, "production"], value);
 }
 

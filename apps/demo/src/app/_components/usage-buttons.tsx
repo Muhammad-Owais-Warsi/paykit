@@ -9,7 +9,7 @@ export function UsageButtons({
 }: {
   disabled: boolean;
   isPending: boolean;
-  onTrack: (amount: number) => void;
+  onTrack: (amount: number) => void | Promise<void>;
 }) {
   return (
     <div className="flex gap-1.5">
@@ -19,7 +19,9 @@ export function UsageButtons({
           variant="outline"
           size="sm"
           disabled={isPending || disabled}
-          onClick={() => onTrack(amount)}
+          onClick={() => {
+            void onTrack(amount);
+          }}
         >
           +{amount}
         </Button>

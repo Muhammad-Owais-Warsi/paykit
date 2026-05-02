@@ -5,7 +5,7 @@ import type { planCatalog } from "@/lib/demo-catalog";
 
 function formatPrice(amount: number | null) {
   if (amount == null) return "$0";
-  return `$${(amount / 100).toFixed(0)}`;
+  return `$${(amount / 100).toFixed(2)}`;
 }
 
 export function PlanCard({

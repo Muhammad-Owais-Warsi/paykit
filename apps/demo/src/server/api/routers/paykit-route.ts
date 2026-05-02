@@ -59,7 +59,7 @@ export function createPaykitRouter<const TFeatureId extends string>(
 
     deleteCustomer: publicProcedure
       .input(z.object({ id: z.string() }))
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async ({ ctx }) => {
         const paykit = requirePaykit();
         const session = await auth.api.getSession({ headers: ctx.headers });
         if (!session) {
@@ -69,7 +69,7 @@ export function createPaykitRouter<const TFeatureId extends string>(
           });
         }
 
-        return paykit.deleteCustomer({ id: input.id });
+        return paykit.deleteCustomer({ id: session.user.id });
       }),
 
     currentPlans: publicProcedure.query(async ({ ctx }) => {

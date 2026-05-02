@@ -38,9 +38,9 @@ export function CheckoutPageContent() {
   const toastShown = useRef(false);
 
   const configuredPaykitScenarios = paykitScenarios.filter(
-    (scenario) => scenarios.data?.[scenario.id].configured,
+    (scenario) => scenarios.data?.[scenario.id]?.configured,
   );
-  const hasAutumn = scenarios.data?.autumn.configured === true;
+  const hasAutumn = scenarios.data?.autumn?.configured === true;
   const availableTabs = [
     ...configuredPaykitScenarios.map((scenario) => scenario.tab),
     ...(hasAutumn ? ["autumn-stripe"] : []),
@@ -87,6 +87,24 @@ export function CheckoutPageContent() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-64" />
         <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (scenarios.isError) {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+          <p className="text-destructive text-sm">
+            {scenarios.error instanceof Error
+              ? scenarios.error.message
+              : "Failed to load billing scenarios."}
+          </p>
+        </div>
+        <Button onClick={() => void scenarios.refetch()} size="sm" variant="outline">
+          Retry
+        </Button>
       </div>
     );
   }

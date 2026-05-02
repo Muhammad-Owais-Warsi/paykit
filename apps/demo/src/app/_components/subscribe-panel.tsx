@@ -117,6 +117,20 @@ function TestClockLoadingPanel() {
   );
 }
 
+function TestClockErrorPanel({ message }: { message: string }) {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>Test clock</CardTitle>
+        <CardDescription>Failed to determine test clock support.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-destructive text-sm">{message}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function StripeTestClockPanel() {
   const utils = api.useUtils();
   const queryClient = useQueryClient();
@@ -320,6 +334,14 @@ export function SubscribePanel({ scenario }: { scenario: PayKitScenario }) {
 
       {capabilities.isLoading ? (
         <TestClockLoadingPanel />
+      ) : capabilities.isError ? (
+        <TestClockErrorPanel
+          message={
+            capabilities.error instanceof Error
+              ? capabilities.error.message
+              : "Failed to load provider capabilities"
+          }
+        />
       ) : capabilities.data?.testClocks && scenario === "stripe" ? (
         <StripeTestClockPanel />
       ) : (

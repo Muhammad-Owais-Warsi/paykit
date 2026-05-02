@@ -43,7 +43,6 @@ Enforced by oxlint, oxfmt, and TypeScript config. Follow strictly.
 
 - Strict mode with `noUncheckedIndexedAccess`, `useConst` enforced
 - `import type` with separated style; Node.js protocol (`node:fs`, `node:path`)
-- `import * as z from "zod"`, never `import { z } from "zod"`
 - No `@ts-ignore` (use `@ts-expect-error` with explanation), no `any` (use `unknown`), no `delete`, no implicit `any` on `let`
 - All promises must be awaited or explicitly voided
 - Avoid classes (use functions/objects) and enums (use `as const` or unions)

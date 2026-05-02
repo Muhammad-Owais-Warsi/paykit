@@ -58,11 +58,89 @@ function findExistingFile(cwd: string, candidates: string[]): string | null {
 }
 
 function generateConfigFile(templateId: string, includeIdentify: boolean): string {
-  const planImports =
-    templateId === "saas-starter" ? "free, pro" : templateId === "usage-based" ? "free, pro" : "";
+  const productImports =
+    templateId === "saas-starter"
+      ? ["free", "pro"]
+      : templateId === "usage-based"
+        ? ["free", "pro"]
+        : [];
 
-  const productsLine = planImports ? `\n  products: [${planImports}],` : "\n  products: [],";
-  const importLine = planImports ? `\nimport { ${planImports} } from "./paykit-products";` : "";
+  const productsLine = productImports.length
+    ? `\n  products: [${productImports.join(", ")}],`
+    : "\n  products: [],";
+  const importLine = productImports.length
+    ? `\nimport { ${productImports.join(", ")} } from "./paykit-products";`
+    : "";
+
+  const identifyBlock = includeIdentify
+    ? `
+  identify: async (request) => {
+    // Replace with your auth logic, for example:
+    // const session = await auth.api.getSession({ headers: request.headers });
+    // if (!session) return null;
+    // return {
+    //   customerId: session.user.id,
+    //   email: session.user.email,
+    //   name: session.user.name,
+    // };
+    return null;
+  },`
+    : "";
+
+  return `import { stripe } from "@paykitjs/stripe";
+import { createPayKit } from "paykitjs";${importLine}
+
+export const paykit = createPayKit({
+  database: process.env.DATABASE_URL!,
+  provider: stripe({
+    secretKey: process.env.STRIPE_SECRET_KEY!,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+  }),${productsLine}${identifyBlock}
+});
+`;
+}
+
+function detectExistingProductsModule(content: string): string[] | null {
+  const namedExports = Array.from(
+    content.matchAll(/export const\s+([a-zA-Z0-9_]+)\s*=/g),
+    (match) => {
+      const exportName = match[1];
+      return exportName ?? "";
+    },
+  ).filter((exportName) => exportName.length > 0);
+  if (namedExports.length > 0) {
+    return namedExports;
+  }
+
+  const reExportMatch = content.match(/export\s*\{([^}]+)\}/);
+  if (!reExportMatch) {
+    return null;
+  }
+
+  const reExportList = reExportMatch[1] ?? "";
+
+  return reExportList
+    .split(",")
+    .map((part) =>
+      part
+        .trim()
+        .split(/\s+as\s+/i)[0]
+        ?.trim(),
+    )
+    .filter((part): part is string => Boolean(part));
+}
+
+function generateConfigFileFromProductsModule(
+  productNames: string[],
+  includeIdentify: boolean,
+): string {
+  const uniqueProductNames = Array.from(new Set(productNames));
+  const productsLine = uniqueProductNames.length
+    ? `\n  products: [${uniqueProductNames.join(", ")}],`
+    : "\n  products: [],";
+  const importLine = uniqueProductNames.length
+    ? `\nimport { ${uniqueProductNames.join(", ")} } from "./paykit-products";`
+    : "";
 
   const identifyBlock = includeIdentify
     ? `
@@ -357,6 +435,9 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
   const productsPath = configPath.replace(/paykit(\.config)?\.ts$/, "paykit-products.ts");
   const productsFullPath = path.join(cwd, productsPath);
   let templateId: string | symbol = "saas-starter";
+  const existingProductsModule = fs.existsSync(productsFullPath)
+    ? detectExistingProductsModule(fs.readFileSync(productsFullPath, "utf8"))
+    : null;
 
   if (!fs.existsSync(productsFullPath) && !useDefaults) {
     templateId = await p.select({
@@ -401,7 +482,9 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
   if (!existingConfig) {
     files.push({
       path: configPath,
-      content: generateConfigFile(templateId as string, clientPath !== null),
+      content: existingProductsModule
+        ? generateConfigFileFromProductsModule(existingProductsModule, clientPath !== null)
+        : generateConfigFile(templateId as string, clientPath !== null),
     });
   }
 

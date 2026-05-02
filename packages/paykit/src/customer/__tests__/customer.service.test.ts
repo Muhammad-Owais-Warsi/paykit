@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PayKitContext } from "../../core/context";
 import type { Customer } from "../../types/models";
+import type { NormalizedSchema } from "../../types/schema";
 import { getCustomerWithDetails, listCustomers, upsertCustomer } from "../customer.service";
+
+const emptyProducts: NormalizedSchema = {
+  features: [],
+  plans: [],
+  planMap: new Map(),
+};
 
 function createCustomerRow(overrides: Partial<Customer> = {}): Customer {
   const now = new Date("2024-01-01T00:00:00.000Z");
@@ -110,7 +117,7 @@ describe("customer/service", () => {
         },
         testing: { enabled: true },
       },
-      products: { plans: [] },
+      products: emptyProducts,
       provider: {
         capabilities: { testClocks: true },
         id: "stripe",
@@ -206,7 +213,7 @@ describe("customer/service", () => {
           createAdapter: vi.fn(),
         },
       },
-      products: { plans: [] },
+      products: emptyProducts,
       provider: {
         capabilities: { testClocks: true },
         id: "stripe",
@@ -382,7 +389,7 @@ describe("customer/service", () => {
       options: {
         provider: { id: "stripe", name: "Stripe", createAdapter: vi.fn() },
       },
-      products: { plans: [] },
+      products: emptyProducts,
       provider: providerMock,
     } as unknown as PayKitContext;
 
@@ -435,7 +442,7 @@ describe("customer/service", () => {
       options: {
         provider: { id: "stripe", name: "Stripe", createAdapter: vi.fn() },
       },
-      products: { plans: [] },
+      products: emptyProducts,
       provider: providerMock,
     } as unknown as PayKitContext;
 
@@ -482,7 +489,7 @@ describe("customer/service", () => {
       options: {
         provider: { id: "stripe", name: "Stripe", createAdapter: vi.fn() },
       },
-      products: { plans: [] },
+      products: emptyProducts,
       provider: providerMock,
     } as unknown as PayKitContext;
 

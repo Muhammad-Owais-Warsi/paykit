@@ -25,7 +25,9 @@ export const scenarioConfig = {
 export type ScenarioConfig = typeof scenarioConfig;
 
 export function getConfiguredScenarios() {
-  return scenarioConfig;
+  return Object.fromEntries(
+    Object.entries(scenarioConfig).filter(([, scenario]) => scenario.configured),
+  ) as Partial<ScenarioConfig>;
 }
 
 export function requireScenarioEnv<T extends string | undefined>(

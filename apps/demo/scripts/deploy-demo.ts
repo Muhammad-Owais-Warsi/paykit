@@ -111,10 +111,15 @@ function patchDemoPackage(tempRoot: string, version: string): void {
   };
 
   manifest.dependencies ??= {};
-  delete manifest.dependencies["@paykitjs/dash"];
+  const dependencies = Object.fromEntries(
+    Object.entries(manifest.dependencies).filter(
+      ([packageName]) => packageName !== "@paykitjs/dash",
+    ),
+  );
   for (const packageName of PAYKIT_PACKAGES) {
-    manifest.dependencies[packageName] = version;
+    dependencies[packageName] = version;
   }
+  manifest.dependencies = dependencies;
 
   fs.writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`);
 }

@@ -16,7 +16,7 @@ function createPaykitPolar() {
       webhookSecret: requireScenarioEnv(env.POLAR_WEBHOOK_SECRET, "POLAR_WEBHOOK_SECRET"),
       server: "sandbox",
     }),
-    plans: [pro, ultra, free],
+    products: [pro, ultra, free],
     identify: async (request) => {
       const session = await auth.api.getSession({ headers: request.headers });
       if (!session) return null;

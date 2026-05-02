@@ -16,7 +16,7 @@ function createPaykitStripe() {
       webhookSecret: requireScenarioEnv(env.STRIPE_WEBHOOK_SECRET, "STRIPE_WEBHOOK_SECRET"),
     }),
     testing: { enabled: true },
-    plans: [pro, ultra, free],
+    products: [pro, ultra, free],
     identify: async (request) => {
       const session = await auth.api.getSession({ headers: request.headers });
       if (!session) return null;

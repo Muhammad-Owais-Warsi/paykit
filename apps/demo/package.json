@@ -8,9 +8,12 @@
     "check": "biome check .",
     "check:unsafe": "biome check --write --unsafe .",
     "check:write": "biome check --write .",
+    "deploy:sandbox": "bun scripts/deploy-sandbox.ts",
     "dev": "next dev",
     "dev:tunnel": "concurrently -k -n next,tunnel -c blue,magenta \"bun dev\" \"bun tunnel\"",
+    "env:push:sandbox": "bun scripts/push-sandbox-env.ts",
     "preview": "next build && next start",
+    "push:sandbox": "bun scripts/push-sandbox.ts",
     "start": "next start",
     "tunnel": "set -a; [ -f .env ] && . ./.env; set +a; if [ -n \"$CF_TUNNEL_ID\" ]; then cloudflared tunnel --url http://localhost:3000 run \"$CF_TUNNEL_ID\"; fi",
     "paykitjs": "tsx --conditions=paykit-source ../../packages/paykit/src/cli/index.ts",
@@ -20,10 +23,6 @@
     "push:paykit:polar": "set -a; [ -f .env ] && . ./.env; set +a; if [ -n \"$POLAR_DATABASE_URL\" ] && [ -n \"$POLAR_ACCESS_TOKEN\" ] && [ -n \"$POLAR_WEBHOOK_SECRET\" ]; then bunx paykitjs push --config paykit.polar.config.ts --yes; else printf '%s\\n' 'Skipping PayKit Polar push: provider env incomplete'; fi",
     "push:paykit:stripe": "set -a; [ -f .env ] && . ./.env; set +a; if [ -n \"$STRIPE_DATABASE_URL\" ] && [ -n \"$STRIPE_SECRET_KEY\" ] && [ -n \"$STRIPE_WEBHOOK_SECRET\" ]; then bunx paykitjs push --config paykit.stripe.config.ts --yes; else printf '%s\\n' 'Skipping PayKit Stripe push: provider env incomplete'; fi",
     "push:autumn": "set -a; [ -f .env ] && . ./.env; set +a; if [ -n \"$AUTUMN_SECRET_KEY\" ]; then atmn push; else printf '%s\\n' 'Skipping Autumn push: provider env incomplete'; fi",
-    "env:push:canary": "bun scripts/sync-vercel-env.ts canary",
-    "env:push:prod": "bun scripts/sync-vercel-env.ts prod",
-    "deploy:canary": "bun scripts/deploy-demo.ts canary",
-    "deploy:prod": "bun scripts/deploy-demo.ts prod",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

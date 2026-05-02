@@ -146,7 +146,7 @@
     },
     "packages/dash": {
       "name": "@paykitjs/dash",
-      "version": "0.0.4-canary.4",
+      "version": "0.0.4-canary.5",
       "dependencies": {
         "@base-ui/react": "^1.2.0",
         "@fontsource-variable/geist": "^5.2.8",
@@ -172,7 +172,7 @@
     },
     "packages/paykit": {
       "name": "paykitjs",
-      "version": "0.0.4-canary.4",
+      "version": "0.0.4-canary.5",
       "bin": {
         "paykitjs": "./dist/cli/index.js",
       },
@@ -201,7 +201,7 @@
     },
     "packages/polar": {
       "name": "@paykitjs/polar",
-      "version": "0.0.4-canary.4",
+      "version": "0.0.4-canary.5",
       "dependencies": {
         "@polar-sh/sdk": "^0.47.0",
         "paykitjs": "workspace:*",
@@ -214,7 +214,7 @@
     },
     "packages/stripe": {
       "name": "@paykitjs/stripe",
-      "version": "0.0.4-canary.4",
+      "version": "0.0.4-canary.5",
       "dependencies": {
         "paykitjs": "workspace:*",
         "stripe": "^19.1.0",

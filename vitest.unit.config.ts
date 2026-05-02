@@ -1,8 +1,10 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  resolve: {
-    conditions: ["paykit-source"],
+  ssr: {
+    resolve: {
+      conditions: ["paykit-source"],
+    },
   },
   test: {
     environment: "node",

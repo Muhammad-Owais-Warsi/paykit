@@ -1,78 +1,29 @@
 # AGENTS.md
 
-## Project Overview
+## Project
 
-PayKit is a TypeScript-first payments orchestration framework for modern SaaS.
-It sits between your app and payment providers (Stripe, PayPal, regional PSPs),
-providing a unified API without vendor lock-in. PayKit does **not** process
-payments — it orchestrates them.
+PayKit is an embedded billing framework for TypeScript apps. It runs inside the
+user's app, uses their database, and provides APIs for plans, subscriptions,
+entitlements, and usage billing.
 
-Read `ob/spec.md` before making architectural decisions.
-
-## Commands
-
-```bash
-bun install           # Install dependencies
-bun build             # Build all packages (Turbo)
-bun dev               # Dev mode (Turbo, persistent)
-bun lint              # Lint with oxlint (--deny-warnings)
-bun lint:fix          # Auto-fix lint issues
-bun format            # Format with oxfmt
-bun format:check      # Check formatting
-bun typecheck         # Type check (tsc --build)
-```
-
-Run specific tests with `vitest /path/to/<test-file> -t <pattern>`, not `bun test`.
-
-## Tech Stack
-
-- **Runtime**: Node.js >= 22 | **Package manager**: bun 1.3.13 (workspaces)
-- **Build**: Turbo 2.8.10 | **Language**: TypeScript 5.9.2 (strict, composite)
-- **Linter**: oxlint 1.51 | **Formatter**: oxfmt 0.36 | **Validation**: Zod 4
-- **Git hooks**: simple-git-hooks + lint-staged (runs `oxlint --fix` + `oxfmt --write` on commit)
-
-### Web App
-
-- **Framework**: Next.js (App Router) | **Styling**: Tailwind CSS v4
-- **Animations**: Framer Motion | **Components**: shadcn/ui + fumadocs-ui
-- **Code highlighting**: Shiki with custom Vercel Dark theme (`apps/web/src/lib/shiki-vercel-theme.ts`), applied as default in `DynamicCodeBlock`
+PayKit should feel like application code, not a hosted billing platform or a thin
+provider SDK wrapper. Keep provider-specific details behind typed, composable
+APIs.
 
 ## Code Style
 
-Enforced by oxlint, oxfmt, and TypeScript config. Follow strictly.
-
-- Strict mode with `noUncheckedIndexedAccess`, `useConst` enforced
-- `import type` with separated style; Node.js protocol (`node:fs`, `node:path`)
-- No `@ts-ignore` (use `@ts-expect-error` with explanation), no `any` (use `unknown`), no `delete`, no implicit `any` on `let`
-- All promises must be awaited or explicitly voided
-- Avoid classes (use functions/objects) and enums (use `as const` or unions)
-- No `Buffer` in library code — use `Uint8Array`. `Buffer` allowed in tests
-- 2-space indent, oxfmt handles formatting — do not add Prettier or Biome
-- while using tailwing, prefer sizes in tw units like `-5` rather than in pixels via `-[20px]`
-- prefer to co-locate component Props with a function, rather than separating them into an interface
-- while using Zod, prefer not duplicate types, just infer them from schemas
-
-Do not write comments separating sections like this:
-// ---------------------------------------------------------------------------
-The only comments you may write should be JSDoc, inlilne clarifying comments, preferable very short and under one line. Only if necessary
-
-## Git & Testing
-
-- PRs target `main`. Conventional Commits: `feat(scope):`, `fix(scope):`, `docs:`, `chore:`
-- Scope = package name: `feat(stripe): add webhook handler`
-- Vitest for tests. Add `@see` JSDoc with issue URL for regression tests
+- Follow the repository's formatter, linter, and TypeScript config.
+- Use `import type` for type-only imports.
+- Prefer functions and plain objects over classes.
+- Keep comments rare and about code logic. Do not add unnecessary separator comments.
+- Prefer keeping code comments single line over multi line, exception for JSDoc
+- Prefer adding JSDoc on most functions in the library core, and on some object properties mainly if api is used in many places, or user-facing
+- Keep JSDoc strings short and useful
+- while writing JSDoc follow it's standards, such as tags
 
 ## Behavior
 
-- When asked opinion questions ("Maybe do this?", "what do you think?", "should we do X?"), **only answer** — don't make code changes unless explicitly asked!!
-- Never `git commit`, `git push`, or run database migrations without explicit approval or being asked
-- while generating a db migration, always provide --name. like bun db:generate --name add_product_table
-- never edit past migrations, only way is generating new one
-
-## gstack
-
-Use /browse from gstack for all web browsing. Never use mcp**claude-in-chrome**\* tools.
-Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
-/design-consultation, /review, /ship, /browse, /qa, /qa-only, /design-review,
-/setup-browser-cookies, /retro, /investigate, /document-release, /codex, /careful,
-/freeze, /guard, /unfreeze, /gstack-upgrade.
+- When asked opinion questions, answer only. Do not edit code unless explicitly asked.
+- Never commit, push, or run database migrations unless explicitly asked.
+- When generating migrations, always provide a name.
+- Never edit past migrations; create a new migration instead.

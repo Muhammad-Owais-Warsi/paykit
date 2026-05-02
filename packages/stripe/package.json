@@ -16,7 +16,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "paykit-source": "./src/index.ts",
+      "dev-source": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },

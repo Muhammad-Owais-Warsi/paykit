@@ -27,3 +27,4 @@ APIs.
 - Never commit, push, or run database migrations unless explicitly asked.
 - When generating migrations, always provide a name.
 - Never edit past migrations; create a new migration instead.
+- Never run "deploy" scripts to test anything, only if explicitly asked

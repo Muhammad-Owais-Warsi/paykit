@@ -24,8 +24,8 @@
     "format:check": "oxfmt --check '**/*.{ts,tsx,js,jsx}'",
     "lint": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix",
-    "release": "turbo build --filter=./packages/* && bumpp",
-    "release:canary": "turbo build --filter=./packages/* && bumpp --tag canary",
+    "release": "turbo build --filter=./packages/* && bumpp && bun install --lockfile-only",
+    "release:canary": "turbo build --filter=./packages/* && bumpp --tag canary && bun install --lockfile-only",
     "prepare": "bunx simple-git-hooks || true",
     "worktree:setup": "bash scripts/worktree-setup.sh"
   },

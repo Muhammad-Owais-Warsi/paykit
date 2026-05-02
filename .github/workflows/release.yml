@@ -26,7 +26,7 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: npx changelogithub
         continue-on-error: true
@@ -56,7 +56,12 @@ jobs:
           echo "Publishing with npm tag: $NPM_TAG"
 
       - name: Publish to npm
-        run: npm publish --workspaces --access public --no-git-checks --tag "${{ steps.npm_tag.outputs.tag }}"
+        shell: bash
+        run: |
+          for package_dir in packages/paykit packages/polar packages/stripe; do
+            (cd "$package_dir" && bun publish --access public --tag "${{ steps.npm_tag.outputs.tag }}")
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

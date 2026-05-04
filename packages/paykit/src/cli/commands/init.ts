@@ -41,6 +41,7 @@ function ensureDir(filePath: string): void {
 
 const POSSIBLE_CONFIG_PATHS = buildPossiblePaths(["paykit.ts", "paykit.config.ts"]);
 const POSSIBLE_CLIENT_PATHS = buildPossiblePaths(["paykit-client.ts"]);
+type InitProvider = "stripe" | "polar";
 
 function buildPossiblePaths(basePaths: string[]): string[] {
   const dirs = ["", "lib/", "server/", "utils/"];
@@ -57,7 +58,46 @@ function findExistingFile(cwd: string, candidates: string[]): string | null {
   return null;
 }
 
-function generateConfigFile(templateId: string, includeIdentify: boolean): string {
+function detectExistingProvider(cwd: string, configPath: string | null): InitProvider | null {
+  if (!configPath) return null;
+
+  const content = fs.readFileSync(path.join(cwd, configPath), "utf8");
+  if (content.includes("@paykitjs/polar") || /provider:\s*polar\s*\(/.test(content)) {
+    return "polar";
+  }
+  if (content.includes("@paykitjs/stripe") || /provider:\s*stripe\s*\(/.test(content)) {
+    return "stripe";
+  }
+
+  return null;
+}
+
+function providerImport(provider: InitProvider): string {
+  return provider === "polar"
+    ? `import { polar } from "@paykitjs/polar";`
+    : `import { stripe } from "@paykitjs/stripe";`;
+}
+
+function providerConfig(provider: InitProvider): string {
+  if (provider === "polar") {
+    return `polar({
+    accessToken: process.env.POLAR_ACCESS_TOKEN!,
+    webhookSecret: process.env.POLAR_WEBHOOK_SECRET!,
+    server: process.env.POLAR_SERVER === "sandbox" ? "sandbox" : "production",
+  })`;
+  }
+
+  return `stripe({
+    secretKey: process.env.STRIPE_SECRET_KEY!,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+  })`;
+}
+
+function generateConfigFile(
+  templateId: string,
+  includeIdentify: boolean,
+  provider: InitProvider,
+): string {
   const productImports =
     templateId === "saas-starter"
       ? ["free", "pro"]
@@ -87,15 +127,12 @@ function generateConfigFile(templateId: string, includeIdentify: boolean): strin
   },`
     : "";
 
-  return `import { stripe } from "@paykitjs/stripe";
+  return `${providerImport(provider)}
 import { createPayKit } from "paykitjs";${importLine}
 
 export const paykit = createPayKit({
   database: process.env.DATABASE_URL!,
-  provider: stripe({
-    secretKey: process.env.STRIPE_SECRET_KEY!,
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-  }),${productsLine}${identifyBlock}
+  provider: ${providerConfig(provider)},${productsLine}${identifyBlock}
 });
 `;
 }
@@ -135,6 +172,7 @@ function detectExistingProductsModule(content: string): string[] | null {
 function generateConfigFileFromProductsModule(
   productNames: string[],
   includeIdentify: boolean,
+  provider: InitProvider,
   productsImportPath = "./paykit-products",
 ): string {
   const uniqueProductNames = Array.from(new Set(productNames));
@@ -160,15 +198,12 @@ function generateConfigFileFromProductsModule(
   },`
     : "";
 
-  return `import { stripe } from "@paykitjs/stripe";
+  return `${providerImport(provider)}
 import { createPayKit } from "paykitjs";${importLine}
 
 export const paykit = createPayKit({
   database: process.env.DATABASE_URL!,
-  provider: stripe({
-    secretKey: process.env.STRIPE_SECRET_KEY!,
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-  }),${productsLine}${identifyBlock}
+  provider: ${providerConfig(provider)},${productsLine}${identifyBlock}
 });
 `;
 }
@@ -224,11 +259,19 @@ interface FileToWrite {
   content: string;
 }
 
-const ENV_VARS = [
-  { key: "DATABASE_URL", line: "DATABASE_URL=" },
-  { key: "STRIPE_SECRET_KEY", line: "STRIPE_SECRET_KEY=" },
-  { key: "STRIPE_WEBHOOK_SECRET", line: "STRIPE_WEBHOOK_SECRET=" },
-];
+const ENV_VARS = [{ key: "DATABASE_URL", line: "DATABASE_URL=" }];
+
+const PROVIDER_ENV_VARS: Record<InitProvider, { key: string; line: string }[]> = {
+  polar: [
+    { key: "POLAR_ACCESS_TOKEN", line: "POLAR_ACCESS_TOKEN=" },
+    { key: "POLAR_WEBHOOK_SECRET", line: "POLAR_WEBHOOK_SECRET=" },
+    { key: "POLAR_SERVER", line: "POLAR_SERVER=sandbox" },
+  ],
+  stripe: [
+    { key: "STRIPE_SECRET_KEY", line: "STRIPE_SECRET_KEY=" },
+    { key: "STRIPE_WEBHOOK_SECRET", line: "STRIPE_WEBHOOK_SECRET=" },
+  ],
+};
 
 function frameworksList(): string {
   const c = picocolors.cyan;
@@ -291,14 +334,17 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
   // Check what already exists
   const existingConfig = findExistingFile(cwd, POSSIBLE_CONFIG_PATHS);
   const existingClient = findExistingFile(cwd, POSSIBLE_CLIENT_PATHS);
+  const existingProvider = detectExistingProvider(cwd, existingConfig);
 
   let provider: string | symbol = "stripe";
-  if (!existingConfig && !useDefaults) {
+  if (existingProvider) {
+    provider = existingProvider;
+  } else if (!existingConfig && !useDefaults) {
     provider = await p.select({
       message: "Select payment provider",
       options: [
         { value: "stripe", label: "Stripe" },
-        { value: "polar", label: "Polar", hint: "coming soon", disabled: true },
+        { value: "polar", label: "Polar" },
         { value: "creem", label: "Creem", hint: "coming soon", disabled: true },
       ],
     });
@@ -309,8 +355,11 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
     }
   }
 
+  const selectedProvider: InitProvider = provider === "polar" ? "polar" : "stripe";
+  const envVars = [...ENV_VARS, ...PROVIDER_ENV_VARS[selectedProvider]];
+  const envLineByKey = new Map(envVars.map((v) => [v.key, v.line]));
   const envFiles = getEnvFiles(cwd);
-  const envVarsToAdd = ENV_VARS.map((v) => v.key);
+  const envVarsToAdd = envVars.map((v) => v.key);
 
   if (envFiles.length > 0) {
     const parsed = parseEnvFiles(envFiles);
@@ -321,7 +370,7 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
         if (missing.length === 0) continue;
         updateEnvFiles(
           [file],
-          missing.map((key) => `${key}=`),
+          missing.map((key) => envLineByKey.get(key) ?? `${key}=`),
         );
       }
 
@@ -330,9 +379,9 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
       p.log.success(`Added missing env vars:\n${varList}`);
     }
   } else {
-    const lines = ENV_VARS.map((v) => v.line);
+    const lines = envVars.map((v) => v.line);
     createEnvFile(cwd, lines);
-    p.log.success(`Created .env with ${String(ENV_VARS.length)} variables`);
+    p.log.success(`Created .env with ${String(envVars.length)} variables`);
   }
 
   // For Next.js, detect App Router vs Pages Router
@@ -476,7 +525,8 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
     }
   }
 
-  const packages = ["paykitjs", "@paykitjs/stripe"];
+  const providerPackage = selectedProvider === "polar" ? "@paykitjs/polar" : "@paykitjs/stripe";
+  const packages = ["paykitjs", providerPackage];
   const toInstall = packages.filter((pkg) => !isPackageInstalled(cwd, pkg));
 
   if (toInstall.length > 0) {
@@ -507,9 +557,10 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
         ? generateConfigFileFromProductsModule(
             existingProductsModule,
             clientPath !== null,
+            selectedProvider,
             existingProductsImportPath,
           )
-        : generateConfigFile(templateId as string, clientPath !== null),
+        : generateConfigFile(templateId as string, clientPath !== null, selectedProvider),
     });
   }
 
@@ -563,6 +614,10 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
   const exec = getExecPrefix(pm);
   const c = picocolors.cyan;
   const b = picocolors.bold;
+  const webhookCommand =
+    selectedProvider === "polar"
+      ? "polar listen http://localhost:3000/paykit/webhook"
+      : "stripe listen --forward-to localhost:3000/paykit/webhook";
 
   const isRerun = files.length === 0;
   const heading = isRerun
@@ -583,7 +638,7 @@ async function initAction(options: { cwd: string; defaults: boolean }): Promise<
       `   ${c("•")} Check status: ${b(`${exec} paykitjs status`)}`,
       `   ${c("•")} Sync updated products: ${b(`${exec} paykitjs push`)}`,
       `   ${c("•")} Add AI skills: ${b(`${getDlxPrefix(pm)} skills add getpaykit/skills`)}`,
-      `   ${c("•")} Forward dev webhooks: ${b("stripe listen --forward-to localhost:3000/paykit/webhook")}`,
+      `   ${c("•")} Forward dev webhooks: ${b(webhookCommand)}`,
       "",
       `   Please star us on github ${c("<3")}`,
       `   ${c("https://paykit.sh/github")}`,

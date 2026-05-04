@@ -18,13 +18,18 @@ type PolarWebhookEvent = ReturnType<typeof validateEvent>;
 type PolarSubscriptionEvent = Extract<PolarWebhookEvent, { type?: `subscription.${string}` }>;
 type PolarCheckoutEvent = Extract<PolarWebhookEvent, { type?: `checkout.${string}` }>;
 
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
 function normalizePolarSubscription(sub: PolarSubscriptionEvent["data"]) {
   return {
     cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-    canceledAt: sub.canceledAt ?? null,
-    currentPeriodEndAt: sub.currentPeriodEnd ?? null,
-    currentPeriodStartAt: sub.currentPeriodStart,
-    endedAt: sub.endedAt ?? null,
+    canceledAt: toDate(sub.canceledAt),
+    currentPeriodEndAt: toDate(sub.currentPeriodEnd),
+    currentPeriodStartAt: toDate(sub.currentPeriodStart),
+    endedAt: toDate(sub.endedAt),
     providerProduct: { productId: sub.productId },
     providerSubscriptionId: sub.id,
     providerSubscriptionScheduleId: null,
@@ -211,6 +216,7 @@ export function createPolarProvider(client: Polar, options: PolarOptions): Payme
       const checkout = await client.checkouts.create({
         products: [data.providerProduct.productId!],
         customerId: data.providerCustomerId,
+        metadata: data.metadata,
         successUrl: data.successUrl,
       });
 
@@ -493,6 +499,7 @@ export function createPolarProvider(client: Polar, options: PolarOptions): Payme
         case "subscription.active":
         case "subscription.uncanceled":
         case "subscription.canceled":
+        case "subscription.past_due":
         case "subscription.revoked":
           return createSubscriptionEvents(event, webhookId);
         case "checkout.created":

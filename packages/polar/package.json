@@ -1,6 +1,6 @@
 {
   "name": "@paykitjs/polar",
-  "version": "0.0.4-canary.6",
+  "version": "0.0.4",
   "description": "Polar provider adapter for PayKit",
   "license": "MIT",
   "repository": {

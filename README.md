@@ -21,7 +21,7 @@
   <a href="https://paykit.sh"><strong>Website</strong></a> ·
   <a href="https://paykit.sh/docs"><strong>Docs</strong></a> ·
   <a href="https://discord.gg/nzy9NPpFNU"><strong>Discord</strong></a> ·
-  <a href="https://x.com/getpaykit"><strong>Twitter</strong></a>
+  <a href="https://x.com/paykit_sh"><strong>Twitter</strong></a>
 </p>
 
 <p align="center">

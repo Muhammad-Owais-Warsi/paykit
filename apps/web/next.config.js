@@ -32,7 +32,7 @@ const config = {
   redirects: async () => [
     { source: "/github", destination: "https://github.com/getpaykit/paykit", permanent: false },
     { source: "/discord", destination: "https://discord.gg/nzy9NPpFNU", permanent: false },
-    { source: "/x", destination: "https://x.com/getpaykit", permanent: false },
+    { source: "/x", destination: "https://x.com/paykit_sh", permanent: false },
     {
       source: "/linkedin",
       destination: "https://www.linkedin.com/company/getpaykit",

@@ -16,7 +16,7 @@ export const URLs = {
   githubOrg: "https://github.com/getpaykit",
   githubRepo: "https://github.com/getpaykit/paykit",
   roadmap: "https://github.com/orgs/getpaykit/projects/1",
-  x: "https://x.com/getpaykit",
+  x: "https://x.com/paykit_sh",
   linkedin: "https://www.linkedin.com/company/getpaykit",
   discord: "https://discord.gg/nzy9NPpFNU",
   authorGitHub: "https://github.com/maxktz",

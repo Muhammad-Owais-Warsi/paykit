@@ -54,7 +54,7 @@
 
 - GitHub org avatar: `https://github.com/getpaykit`
 - GitHub repo social image/settings: `https://github.com/getpaykit/paykit`
-- X / Twitter profile avatar: `https://x.com/getpaykit`
+- X / Twitter profile avatar: `https://x.com/paykit_sh`
 - LinkedIn company logo: `https://www.linkedin.com/company/getpaykit`
 - Discord server icon: `https://discord.gg/nzy9NPpFNU`
 

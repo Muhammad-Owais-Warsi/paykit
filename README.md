@@ -6,7 +6,7 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/brand/logo-dark.svg">
       <source media="(prefers-color-scheme: light)" srcset="apps/web/public/brand/logo-light.svg">
-      <img alt="PayKit" src="apps/web/public/brand/logo-light.svg" height="120">
+      <img alt="PayKit" src="apps/web/public/brand/logo-light.svg" height="100">
     </picture>
   </a>
 </p>

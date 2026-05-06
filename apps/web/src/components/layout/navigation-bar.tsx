@@ -51,7 +51,6 @@ function NavLink({
 const navTabs: NavItem[] = [
   { name: "readme", href: "/" },
   { name: "docs", href: "/docs", path: "/docs" },
-  { name: "enterprise", href: "/enterprise", path: "/enterprise" },
 ];
 
 const dropdownLinks: NavItem[] = [

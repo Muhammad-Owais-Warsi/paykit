@@ -17,7 +17,7 @@ export async function submitContactForm(formData: FormData) {
   }
 
   try {
-    await resend.emails.send({
+    const response = await resend.emails.send({
       from: env.RESEND_FROM_EMAIL,
       to: env.RESEND_TO_EMAIL,
       replyTo: email,
@@ -32,8 +32,19 @@ export async function submitContactForm(formData: FormData) {
         .join("\n"),
     });
 
+    if (response.error) {
+      console.error("Failed to send contact inquiry", {
+        error: response.error,
+        headers: response.headers,
+      });
+
+      return { error: "Something went wrong. Please try again or email us directly." };
+    }
+
     return { success: true };
-  } catch {
+  } catch (error) {
+    console.error("Unexpected contact inquiry error", error);
+
     return { error: "Something went wrong. Please try again or email us directly." };
   }
 }

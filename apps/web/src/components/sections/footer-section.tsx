@@ -9,7 +9,7 @@ import { URLs } from "@/lib/consts";
 
 const navLinks = [
   { label: "Docs", href: "/docs" },
-  { label: "Get in touch", href: "/contact" },
+  { label: "Contact", href: "/contact" },
   { label: "Author", href: URLs.authorX, external: true },
 ];
 

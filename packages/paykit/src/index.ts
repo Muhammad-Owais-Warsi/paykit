@@ -29,6 +29,8 @@ export type {
   PaymentProvider,
   ProviderCustomer,
   ProviderCustomerMap,
+  ProviderTunnelAccount,
+  ProviderTunnelWebhook,
   ProviderTestClock,
 } from "./providers/provider";
 export type {

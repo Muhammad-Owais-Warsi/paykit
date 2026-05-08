@@ -31,6 +31,19 @@ export interface PayKitProviderCapabilities {
   testClocks: boolean;
 }
 
+export interface ProviderTunnelAccount {
+  displayName?: string;
+  environment: string;
+  providerAccountId: string;
+  providerId: string;
+}
+
+export interface ProviderTunnelWebhook {
+  created: boolean;
+  endpointId: string;
+  webhookSecret?: string;
+}
+
 export interface ProviderInvoice {
   currency: string;
   hostedUrl?: string | null;
@@ -160,6 +173,7 @@ export interface PaymentProvider {
   }>;
 
   handleWebhook(data: {
+    allowStaleSignatures?: boolean;
     body: string;
     headers: Record<string, string>;
   }): Promise<NormalizedWebhookEvent[]>;
@@ -168,6 +182,15 @@ export interface PaymentProvider {
     providerCustomerId: string;
     returnUrl: string;
   }): Promise<{ url: string }>;
+
+  getTunnelAccount?(): Promise<ProviderTunnelAccount>;
+
+  ensureTunnelWebhook?(data: {
+    existingEndpointId?: string | null;
+    url: string;
+  }): Promise<ProviderTunnelWebhook>;
+
+  disableTunnelWebhook?(data: { endpointId: string }): Promise<void>;
 
   check?(): Promise<{
     ok: boolean;

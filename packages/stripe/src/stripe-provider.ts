@@ -14,6 +14,18 @@ import StripeSdk from "stripe";
 export const PAYKIT_STRIPE_API_VERSION = "2025-10-29.clover";
 
 const STRIPE_MANAGED_PAYMENTS_MIN_VERSION = "2026-03-04.preview";
+const STRIPE_WEBHOOK_EVENTS: StripeSdk.WebhookEndpointCreateParams.EnabledEvent[] = [
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.created",
+  "invoice.finalized",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "invoice.updated",
+  "payment_method.detached",
+];
 
 export interface StripeOptions {
   secretKey: string;
@@ -171,6 +183,10 @@ function assertStripeTestKey(options: StripeOptions): void {
   if (!options.secretKey.startsWith("sk_test_")) {
     throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_TEST_KEY_REQUIRED);
   }
+}
+
+function getStripeEnvironment(secretKey: string): string {
+  return secretKey.startsWith("sk_test_") || secretKey.startsWith("rk_test_") ? "test" : "live";
 }
 
 async function retrieveExpandedSubscription(
@@ -925,13 +941,64 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
         throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_SIGNATURE_MISSING);
       }
 
-      const event = client.webhooks.constructEvent(data.body, signature, options.webhookSecret);
+      const tolerance = data.allowStaleSignatures ? Number.POSITIVE_INFINITY : undefined;
+      const event = client.webhooks.constructEvent(
+        data.body,
+        signature,
+        options.webhookSecret,
+        tolerance,
+      );
       return [
         ...(await createCheckoutCompletedEvents(client, event)),
         ...(await createSubscriptionEvents(event)),
         ...createInvoiceEvents(event),
         ...createDetachedPaymentMethodEvents(event),
       ];
+    },
+
+    async getTunnelAccount() {
+      const account = await client.accounts.retrieve();
+      const displayName =
+        account.settings?.dashboard?.display_name || account.business_profile?.name || account.id;
+      return {
+        displayName,
+        environment: getStripeEnvironment(options.secretKey),
+        providerAccountId: account.id,
+        providerId: "stripe",
+      };
+    },
+
+    async ensureTunnelWebhook(data) {
+      if (data.existingEndpointId) {
+        try {
+          const endpoint = await client.webhookEndpoints.update(data.existingEndpointId, {
+            enabled_events: STRIPE_WEBHOOK_EVENTS,
+            url: data.url,
+          });
+          return {
+            created: false,
+            endpointId: endpoint.id,
+            webhookSecret: options.webhookSecret,
+          };
+        } catch {
+          // Fall through to create a fresh endpoint when the stored one no longer exists.
+        }
+      }
+
+      const endpoint = await client.webhookEndpoints.create({
+        enabled_events: STRIPE_WEBHOOK_EVENTS,
+        url: data.url,
+      });
+
+      return {
+        created: true,
+        endpointId: endpoint.id,
+        webhookSecret: endpoint.secret ?? undefined,
+      };
+    },
+
+    async disableTunnelWebhook(data) {
+      await client.webhookEndpoints.del(data.endpointId);
     },
 
     async createPortalSession(data) {
@@ -943,10 +1010,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
     },
 
     async check() {
-      const mode =
-        options.secretKey.startsWith("sk_test_") || options.secretKey.startsWith("rk_test_")
-          ? "test mode"
-          : "live mode";
+      const mode = getStripeEnvironment(options.secretKey) === "test" ? "test mode" : "live mode";
       try {
         const account = await client.accounts.retrieve();
         const displayName =

@@ -24,15 +24,23 @@ switch (commandName) {
     program.addCommand(pushCommand);
     break;
   }
+  case "listen": {
+    const { listenCommand } = await import("./commands/listen");
+    program.addCommand(listenCommand);
+    break;
+  }
   default: {
-    const [{ statusCommand }, { initCommand }, { pushCommand }] = await Promise.all([
-      import("./commands/status"),
-      import("./commands/init"),
-      import("./commands/push"),
-    ]);
+    const [{ statusCommand }, { initCommand }, { pushCommand }, { listenCommand }] =
+      await Promise.all([
+        import("./commands/status"),
+        import("./commands/init"),
+        import("./commands/push"),
+        import("./commands/listen"),
+      ]);
     program.addCommand(statusCommand);
     program.addCommand(initCommand);
     program.addCommand(pushCommand);
+    program.addCommand(listenCommand);
   }
 }
 

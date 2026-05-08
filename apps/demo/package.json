@@ -16,7 +16,7 @@
     "push:sandbox": "bun scripts/push-sandbox.ts",
     "start": "next start",
     "tunnel": "set -a; [ -f .env ] && . ./.env; set +a; if [ -n \"$CF_TUNNEL_ID\" ]; then cloudflared tunnel --url http://localhost:3000 run \"$CF_TUNNEL_ID\"; fi",
-    "paykitjs": "tsx --conditions=paykit-source ../../packages/paykit/src/cli/index.ts",
+    "paykitjs": "bun ../../packages/paykit/src/cli/index.ts",
     "typecheck": "tsc --noEmit",
     "push": "bun push:auth && bun push:paykit:polar && bun push:paykit:stripe && bun push:autumn",
     "push:auth": "bunx auth migrate --config src/lib/auth.ts --yes",

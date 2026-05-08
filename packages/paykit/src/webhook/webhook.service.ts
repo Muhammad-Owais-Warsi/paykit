@@ -16,6 +16,7 @@ import {
 import type { AnyNormalizedWebhookEvent, WebhookApplyAction } from "../types/events";
 
 export interface HandleWebhookInput {
+  allowStaleSignatures?: boolean;
   body: string;
   headers: Record<string, string>;
 }
@@ -209,6 +210,7 @@ export async function handleWebhook(
   return ctx.logger.trace.run("wh", async () => {
     const startTime = Date.now();
     const events = await ctx.provider.handleWebhook({
+      allowStaleSignatures: input.allowStaleSignatures,
       body: input.body,
       headers: input.headers,
     });

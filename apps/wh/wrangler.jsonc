@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "paykit-wh",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-03",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "paykit-wh",
+      "database_id": "1d9fdd66-9eb5-43fe-ace2-843abce58bf4"
+    }
+  ],
+  "vars": {
+    "MAX_BODY_BYTES": "262144",
+    "MAX_DELIVERIES_PER_TUNNEL": "5000",
+    "RETENTION_DAYS": "30"
+  }
+}

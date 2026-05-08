@@ -2,9 +2,14 @@
 
 import { Command } from "commander";
 
+import { version } from "../version";
+
 process.env.PAYKIT_CLI = "1";
 
-const program = new Command().name("paykitjs").description("CLI for PayKit");
+const program = new Command()
+  .name("paykitjs")
+  .description("CLI for PayKit")
+  .version(version, "-v, --version");
 
 const commandName = process.argv[2];
 

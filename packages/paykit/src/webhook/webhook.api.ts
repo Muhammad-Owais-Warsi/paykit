@@ -10,7 +10,15 @@ function headersToRecord(headers: Headers): Record<string, string> {
 }
 
 function shouldAllowStaleSignatures(headers: Headers): boolean {
-  return process.env.NODE_ENV !== "production" && headers.get("x-paykit-cloud-replay") === "1";
+  if (headers.get("x-paykit-cloud-replay") !== "1") {
+    return false;
+  }
+
+  return (
+    process.env.PAYKIT_ALLOW_STALE_SIGNATURES === "1" ||
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
+  );
 }
 
 /** Applies an incoming provider webhook payload. */

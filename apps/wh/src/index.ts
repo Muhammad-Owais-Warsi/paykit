@@ -98,6 +98,24 @@ async function getOwnedTunnel(params: {
   return rows[0] ?? null;
 }
 
+function readNumberParam(value: string | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function readOptionalNumberParam(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 function buildPullableDeliveryWhere(params: {
   includeFailedBefore?: number;
   retryWindowMs: number;
@@ -142,7 +160,9 @@ async function pruneDeliveries(params: {
   const maxDeliveries = getNumericVar(params.env.MAX_DELIVERIES_PER_TUNNEL, 5000);
   const cutoff = now() - retentionDays * 24 * 60 * 60 * 1000;
 
-  await params.db.delete(delivery).where(lt(delivery.receivedAt, cutoff));
+  await params.db
+    .delete(delivery)
+    .where(and(eq(delivery.tunnelId, params.tunnelId), lt(delivery.receivedAt, cutoff)));
 
   const rows = await params.db
     .select({ count: count() })
@@ -181,9 +201,11 @@ app.post("/api/tunnels/ensure", async (c) => {
     return c.text("providerId, providerAccountId, and environment are required", 400);
   }
 
-  const retryWindowMs = Math.max(0, Number(body.retryWindowMs ?? 0));
+  const retryWindowMs = Math.max(0, readNumberParam(String(body.retryWindowMs ?? "0"), 0));
   const includeFailedBefore =
-    typeof body.includeFailedBefore === "number" ? body.includeFailedBefore : undefined;
+    typeof body.includeFailedBefore === "number" && !Number.isNaN(body.includeFailedBefore)
+      ? body.includeFailedBefore
+      : undefined;
 
   const createIfMissing = body.createIfMissing !== false;
   const existing = await db
@@ -265,9 +287,12 @@ app.get("/api/tunnels/:tunnelId/welcome", async (c) => {
     return c.text("Tunnel not found", 404);
   }
 
-  const retryWindowMs = Math.max(0, Number(c.req.query("retryWindowMs") ?? 0));
-  const includeFailedBeforeRaw = c.req.query("includeFailedBefore");
-  const includeFailedBefore = includeFailedBeforeRaw ? Number(includeFailedBeforeRaw) : undefined;
+  if (current.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
+  }
+
+  const retryWindowMs = Math.max(0, readNumberParam(c.req.query("retryWindowMs"), 0));
+  const includeFailedBefore = readOptionalNumberParam(c.req.query("includeFailedBefore"));
 
   return c.json({
     pendingCount: await getPullableCount(db, {
@@ -290,6 +315,10 @@ app.post("/api/tunnels/:tunnelId/provider-webhook", async (c) => {
 
   if (!current) {
     return c.text("Tunnel not found", 404);
+  }
+
+  if (current.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
   }
 
   const body = (await c.req.json()) as { providerWebhookEndpointId?: string };
@@ -318,11 +347,14 @@ app.get("/api/tunnels/:tunnelId/pull", async (c) => {
     return c.text("Tunnel not found", 404);
   }
 
-  const limit = clamp(Number(c.req.query("limit") ?? 30), 1, 100);
-  const offset = clamp(Number(c.req.query("offset") ?? 0), 0, 10_000);
-  const retryWindowMs = Math.max(0, Number(c.req.query("retryWindowMs") ?? 0));
-  const includeFailedBeforeRaw = c.req.query("includeFailedBefore");
-  const includeFailedBefore = includeFailedBeforeRaw ? Number(includeFailedBeforeRaw) : undefined;
+  if (current.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
+  }
+
+  const limit = clamp(readNumberParam(c.req.query("limit"), 30), 1, 100);
+  const offset = clamp(readNumberParam(c.req.query("offset"), 0), 0, 10_000);
+  const retryWindowMs = Math.max(0, readNumberParam(c.req.query("retryWindowMs"), 0));
+  const includeFailedBefore = readOptionalNumberParam(c.req.query("includeFailedBefore"));
   const deliveries = await db
     .select()
     .from(delivery)
@@ -371,6 +403,10 @@ app.get("/api/deliveries/:deliveryId", async (c) => {
     return c.text("Delivery not found", 404);
   }
 
+  if (currentTunnel.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
+  }
+
   return c.json({
     body: currentDelivery.body,
     deliveredAt: currentDelivery.deliveredAt,
@@ -405,6 +441,10 @@ app.post("/api/deliveries/:deliveryId/ack", async (c) => {
     return c.text("Delivery not found", 404);
   }
 
+  if (currentTunnel.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
+  }
+
   await db
     .update(delivery)
     .set({ deliveredAt: now(), error: null, failedAt: null })
@@ -434,6 +474,10 @@ app.post("/api/deliveries/:deliveryId/fail", async (c) => {
   });
   if (!currentTunnel) {
     return c.text("Delivery not found", 404);
+  }
+
+  if (currentTunnel.status === "disabled") {
+    return c.text("Tunnel disabled", 410);
   }
 
   const body = (await c.req.json()) as { error?: string };

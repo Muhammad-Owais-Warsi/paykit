@@ -189,6 +189,22 @@ function getStripeEnvironment(secretKey: string): string {
   return secretKey.startsWith("sk_test_") || secretKey.startsWith("rk_test_") ? "test" : "live";
 }
 
+function getStripeDisplayName(account: StripeSdk.Account): string {
+  return account.settings?.dashboard?.display_name || account.business_profile?.name || account.id;
+}
+
+function isStripeResourceMissingError(error: unknown): boolean {
+  if (!(error instanceof StripeSdk.errors.StripeError)) {
+    return false;
+  }
+
+  return (
+    error.type === "StripeInvalidRequestError" &&
+    error.code === "resource_missing" &&
+    error.statusCode === 404
+  );
+}
+
 async function retrieveExpandedSubscription(
   client: StripeSdk,
   providerSubscriptionId: string,
@@ -958,8 +974,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
 
     async getTunnelAccount() {
       const account = await client.accounts.retrieve();
-      const displayName =
-        account.settings?.dashboard?.display_name || account.business_profile?.name || account.id;
+      const displayName = getStripeDisplayName(account);
       return {
         displayName,
         environment: getStripeEnvironment(options.secretKey),
@@ -980,7 +995,11 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
             endpointId: endpoint.id,
             webhookSecret: options.webhookSecret,
           };
-        } catch {
+        } catch (error) {
+          if (!isStripeResourceMissingError(error)) {
+            throw error;
+          }
+
           // Fall through to create a fresh endpoint when the stored one no longer exists.
         }
       }
@@ -1013,8 +1032,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
       const mode = getStripeEnvironment(options.secretKey) === "test" ? "test mode" : "live mode";
       try {
         const account = await client.accounts.retrieve();
-        const displayName =
-          account.settings?.dashboard?.display_name || account.business_profile?.name || account.id;
+        const displayName = getStripeDisplayName(account);
 
         let webhookEndpoints: Array<{ url: string; status: string }> = [];
         try {

@@ -19,7 +19,13 @@ export function getDeviceConfigPath(): string {
 
 export function getOrCreateDeviceToken(): string {
   if (fs.existsSync(DEVICE_CONFIG_PATH)) {
-    const parsed = JSON.parse(fs.readFileSync(DEVICE_CONFIG_PATH, "utf8")) as Partial<DeviceConfig>;
+    let parsed: Partial<DeviceConfig> = {};
+    try {
+      parsed = JSON.parse(fs.readFileSync(DEVICE_CONFIG_PATH, "utf8")) as Partial<DeviceConfig>;
+    } catch {
+      console.warn(`Invalid device token config at ${DEVICE_CONFIG_PATH}, creating a fresh token.`);
+    }
+
     if (typeof parsed.deviceToken === "string" && parsed.deviceToken.length > 0) {
       return parsed.deviceToken;
     }
@@ -27,6 +33,8 @@ export function getOrCreateDeviceToken(): string {
 
   const deviceToken = generateDeviceToken();
   fs.mkdirSync(path.dirname(DEVICE_CONFIG_PATH), { recursive: true });
-  fs.writeFileSync(DEVICE_CONFIG_PATH, JSON.stringify({ deviceToken }, null, 2) + "\n");
+  fs.writeFileSync(DEVICE_CONFIG_PATH, JSON.stringify({ deviceToken }, null, 2) + "\n", {
+    mode: 0o600,
+  });
   return deviceToken;
 }

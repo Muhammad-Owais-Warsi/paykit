@@ -12,6 +12,8 @@ import { capture } from "../utils/telemetry";
 const DEFAULT_CLOUD_BASE_URL = "https://wh.paykit.sh";
 const DEFAULT_URL = "http://localhost:3000";
 const DEFAULT_BATCH_SIZE = 30;
+const DEFAULT_ERROR_BACKOFF_MS = 2_000;
+const MAX_ERROR_BACKOFF_MS = 15_000;
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_RETRY_WINDOW = "5m";
 const REPLAY_HEADER = "x-paykit-cloud-replay";
@@ -447,6 +449,10 @@ async function processPendingDeliveries(params: {
   return { hadDeliveries: true, processedCount: deliveries.length };
 }
 
+function getNextErrorBackoff(currentMs: number): number {
+  return currentMs === 0 ? DEFAULT_ERROR_BACKOFF_MS : Math.min(currentMs * 2, MAX_ERROR_BACKOFF_MS);
+}
+
 async function loadRelayRuntimeContext(params: {
   configPath?: string;
   cwd: string;
@@ -519,31 +525,41 @@ async function listenAction(options: {
   }
 
   let mode: "live" | "replay" = "replay";
+  let errorBackoffMs = 0;
 
   for (;;) {
-    const deliveries = await pullDeliveries({
-      deviceToken,
-      includeFailedBefore: mode === "replay" ? relayStartedAt : undefined,
-      limit: DEFAULT_BATCH_SIZE,
-      retryWindowMs: mode === "replay" ? retryWindowMs : 0,
-      tunnelId: tunnel.tunnelId,
-    });
+    try {
+      const deliveries = await pullDeliveries({
+        deviceToken,
+        includeFailedBefore: mode === "replay" ? relayStartedAt : undefined,
+        limit: DEFAULT_BATCH_SIZE,
+        retryWindowMs: mode === "replay" ? retryWindowMs : 0,
+        tunnelId: tunnel.tunnelId,
+      });
 
-    const result = await processPendingDeliveries({
-      devLogger,
-      deliveries,
-      deviceToken,
-      localWebhookUrl,
-      mode,
-    });
+      const result = await processPendingDeliveries({
+        devLogger,
+        deliveries,
+        deviceToken,
+        localWebhookUrl,
+        mode,
+      });
 
-    if (!result.hadDeliveries && mode === "replay") {
-      devLogger.info("replay complete, listening for new webhooks");
-      mode = "live";
-      continue;
+      errorBackoffMs = 0;
+
+      if (!result.hadDeliveries && mode === "replay") {
+        devLogger.info("replay complete, listening for new webhooks");
+        mode = "live";
+        continue;
+      }
+
+      await sleep(result.processedCount > 0 ? 250 : DEFAULT_POLL_INTERVAL_MS);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      devLogger.warn(`Listen loop failed: ${message}`);
+      errorBackoffMs = getNextErrorBackoff(errorBackoffMs);
+      await sleep(errorBackoffMs);
     }
-
-    await sleep(result.processedCount > 0 ? 250 : DEFAULT_POLL_INTERVAL_MS);
   }
 }
 
@@ -573,9 +589,8 @@ async function enableAction(options: { config?: string; cwd: string; url: string
   devLogger.update("Ensuring webhook endpoint");
   const { webhookSecret } = await syncProviderWebhook({ deviceToken, provider, tunnel });
 
-  const localWebhookUrl = buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
+  buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
   devLogger.stop();
-  void localWebhookUrl;
   printEnableSummary(devLogger, {
     account,
     webhookSecret,

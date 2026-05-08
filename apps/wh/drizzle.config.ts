@@ -4,6 +4,7 @@ import path from "node:path";
 import { defineConfig } from "drizzle-kit";
 
 const d1StateDir = path.resolve(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
+const isGenerateCommand = process.argv.includes("generate");
 
 function resolveLocalSqliteFile(): string {
   const files = fs
@@ -26,6 +27,8 @@ export default defineConfig({
   out: "./migrations",
   schema: "./src/db/schema.ts",
   dbCredentials: {
-    url: resolveLocalSqliteFile(),
+    get url() {
+      return isGenerateCommand ? ":memory:" : resolveLocalSqliteFile();
+    },
   },
 });

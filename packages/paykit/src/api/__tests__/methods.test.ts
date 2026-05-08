@@ -83,6 +83,7 @@ describe("api/methods router", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ received: true });
     expect(handleWebhook).toHaveBeenCalledWith({
+      allowStaleSignatures: false,
       body: '{"ok":true}',
       headers: {
         "content-type": "text/plain;charset=UTF-8",

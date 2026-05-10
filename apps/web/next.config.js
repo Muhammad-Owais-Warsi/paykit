@@ -35,7 +35,7 @@ const config = {
     { source: "/x", destination: "https://x.com/paykit_sh", permanent: false },
     {
       source: "/linkedin",
-      destination: "https://www.linkedin.com/company/getpaykit",
+      destination: "https://www.linkedin.com/company/paykit-sh",
       permanent: false,
     },
     {

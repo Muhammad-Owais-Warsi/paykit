@@ -5,6 +5,8 @@ import {
   type PayKitProviderConfig,
   type PaymentProvider,
 } from "paykitjs";
+import type Razorpay from "razorpay";
+import type { INormalizeError } from "razorpay/dist/types/api";
 import type { Payments } from "razorpay/dist/types/payments";
 import type { Subscriptions } from "razorpay/dist/types/subscriptions";
 
@@ -26,6 +28,10 @@ function notSupported(method: string): never {
     PAYKIT_ERROR_CODES.PROVIDER_WEBHOOK_INVALID,
     `${method} is not supported by the Razorpay provider.`,
   );
+}
+
+function isRazorpayError(error: unknown): error is INormalizeError {
+  return typeof error === "object" && error !== null && "statusCode" in error && "error" in error;
 }
 
 function toDate(value: Date | string | number | null | undefined): Date | null {
@@ -127,4 +133,97 @@ function createCheckoutEvents(
       },
     },
   ];
+}
+
+export function createRazorpayProvider(
+  client: Razorpay,
+  options: RazorpayOptions,
+): PaymentProvider {
+  return {
+    id: "razorpay",
+    name: "Razorpay",
+    capabilities: { testClocks: false },
+
+    async createCustomer(data) {
+      if (!data.email) {
+        throw PayKitError.from(
+          "BAD_REQUEST",
+          PAYKIT_ERROR_CODES.CUSTOMER_CREATE_FAILED,
+          "Razorpay requires a non-empty email to create a customer",
+        );
+      }
+
+      const customerMetadata = {
+        ...data.metadata,
+        paykitCustomerId: data.id,
+      };
+
+      try {
+        const customer = await client.customers.create({
+          email: data.email,
+          name: data.name,
+          notes: customerMetadata,
+          fail_existing: 0,
+        });
+
+        await client.customers.edit(customer.id, {
+          email: data.email,
+          name: data.name,
+        });
+
+        return {
+          providerCustomer: { id: customer.id },
+        };
+      } catch (error) {
+        throw PayKitError.from(
+          "BAD_REQUEST",
+          PAYKIT_ERROR_CODES.CUSTOMER_CREATE_FAILED,
+          "Failed to create or find customer on Razorpay",
+        );
+      }
+    },
+
+    async updateCustomer(data) {
+      await client.customers.edit(data.providerCustomerId, {
+        email: data.email,
+        name: data.name,
+      });
+    },
+
+    async deleteCustomer(data) {
+      notSupported("deleteCustomer");
+    },
+
+    getTestClock() {
+      return notSupported("getTestClock");
+    },
+
+    advanceTestClock() {
+      return notSupported("advanceTestClock");
+    },
+
+    attachPaymentMethod() {
+      return notSupported("attachPaymentMethod");
+    },
+
+    async createSubscriptionCheckout(data) {
+      const checkout = await client.subscriptions.create({
+        plan_id: data.providerProduct.plan_id!,
+        total_count: 1, // for now set to 1, as paykit doesnt support this prop
+      });
+
+      if (checkout.short_url) {
+        throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_SESSION_INVALID);
+      }
+
+      return {
+        paymentUrl: checkout.short_url,
+        providerCheckoutSessionId: checkout.id,
+      };
+    },
+
+    createSubscription() {
+      return notSupported("createSubscription (use checkout instead)");
+    },
+  };
 }

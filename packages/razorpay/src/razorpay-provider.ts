@@ -5,6 +5,7 @@ import {
   type PayKitProviderConfig,
   type PaymentProvider,
 } from "paykitjs";
+import type { Payments } from "razorpay/dist/types/payments";
 import type { Subscriptions } from "razorpay/dist/types/subscriptions";
 
 export interface RazorpayOptions {
@@ -17,6 +18,7 @@ export type RazorpayProviderConfig = PayKitProviderConfig & {
 };
 
 type RazorpaySubscription = Subscriptions.RazorpaySubscription;
+type RazorpayPayment = Payments.RazorpayPayment;
 
 function notSupported(method: string): never {
   throw PayKitError.from(
@@ -43,4 +45,86 @@ function normalizeRazorpaySubscription(sub: RazorpaySubscription) {
     providerSubscriptionScheduleId: null,
     status: sub.status,
   };
+}
+
+function createSubscriptionEvents(
+  event: { type?: string; data: RazorpaySubscription },
+  webhookId: string,
+): NormalizedWebhookEvent[] {
+  const sub = event.data;
+  const normalized = normalizeRazorpaySubscription(sub);
+
+  const providerCustomerId = sub.customer_id;
+  if (!providerCustomerId) return [];
+
+  if (event.type === "subscription.cancelled") {
+    return [
+      {
+        actions: [
+          {
+            data: {
+              providerCustomerId,
+              providerSubscriptionId: sub.id,
+            },
+            type: "subscription.delete",
+          },
+        ],
+        name: "subscription.deleted",
+        payload: {
+          providerCustomerId,
+          providerEventId: webhookId,
+          providerSubscriptionId: sub.id,
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      actions: [
+        {
+          data: {
+            providerCustomerId,
+            subscription: normalized,
+          },
+          type: "subscription.upsert",
+        },
+      ],
+      name: "subscription.updated",
+      payload: {
+        providerCustomerId,
+        providerEventId: webhookId,
+        subscription: normalized,
+      },
+    },
+  ];
+}
+
+function createCheckoutEvents(
+  event: { type?: string; data: RazorpayPayment },
+  webhookId: string,
+): NormalizedWebhookEvent[] {
+  const payment = event.data;
+  if (payment.status !== "captured") return [];
+
+  const providerCustomerId = payment.customer_id;
+  if (!providerCustomerId) return [];
+
+  return [
+    {
+      name: "checkout.completed",
+      payload: {
+        checkoutSessionId: payment.id,
+        mode: "subscription",
+        paymentStatus: "paid",
+        providerCustomerId,
+        providerEventId: webhookId,
+        providerSubscriptionId: payment.subscription_id ?? undefined,
+        status: payment.status,
+        metadata: payment.notes
+          ? Object.fromEntries(Object.entries(payment.notes).map(([k, v]) => [k, String(v)]))
+          : undefined,
+      },
+    },
+  ];
 }

@@ -225,5 +225,23 @@ export function createRazorpayProvider(
     createSubscription() {
       return notSupported("createSubscription (use checkout instead)");
     },
+
+    async updateSubscription(data) {
+      const sub = await client.subscriptions.update(data.providerSubscriptionId, {
+        plan_id: data.providerProduct.plan_id!,
+        schedule_change_at: "now",
+      });
+
+      return {
+        paymentUrl: null,
+        subscription: {
+          cancelAtPeriodEnd: false, // razorpay don't have option to track this, we need to rely on webhooks
+          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
+          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          providerSubscriptionId: sub.id,
+          status: sub.status,
+        },
+      };
+    },
   };
 }

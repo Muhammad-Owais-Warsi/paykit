@@ -57,6 +57,7 @@ const dropdownLinks: NavItem[] = [
   { name: "Discord", href: URLs.discord, external: true },
   { name: "Twitter / X", href: URLs.x, external: true },
   { name: "LinkedIn", href: URLs.linkedin, external: true },
+  { name: "llms.txt", href: URLs.llmsTxt, external: true },
 ];
 
 const mobileLinks: NavItem[] = [
@@ -222,6 +223,14 @@ export function NavigationBar({ stars: _stars }: { stars: number | null }) {
                 >
                   <Github className="size-3.5" />
                   <span>GitHub</span>
+                </Button>
+                <Button
+                  render={<Link href={URLs.llmsTxt} target="_blank" rel="noopener noreferrer" />}
+                  nativeButton={false}
+                  variant={"link"}
+                  size="sm"
+                >
+                  <span>llms.txt</span>
                 </Button>
               </div>
             </div>

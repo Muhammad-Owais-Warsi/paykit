@@ -7,6 +7,7 @@ import {
 } from "paykitjs";
 import type Razorpay from "razorpay";
 import type { INormalizeError } from "razorpay/dist/types/api";
+import type { Invoices } from "razorpay/dist/types/invoices";
 import type { Payments } from "razorpay/dist/types/payments";
 import type { Subscriptions } from "razorpay/dist/types/subscriptions";
 
@@ -21,6 +22,7 @@ export type RazorpayProviderConfig = PayKitProviderConfig & {
 
 type RazorpaySubscription = Subscriptions.RazorpaySubscription;
 type RazorpayPayment = Payments.RazorpayPayment;
+type RazorpayInvoice = Invoices.RazorpayInvoice;
 
 function notSupported(method: string): never {
   throw PayKitError.from(
@@ -50,6 +52,18 @@ function normalizeRazorpaySubscription(sub: RazorpaySubscription) {
     providerSubscriptionId: sub.id,
     providerSubscriptionScheduleId: null,
     status: sub.status,
+  };
+}
+
+function normalizeRazorpayInvoice(invoice: RazorpayInvoice) {
+  return {
+    currency: invoice.currency ?? "INR", // It seems we need to include currency attribute in data object
+    hostedUrl: invoice.short_url,
+    periodEndAt: null,
+    periodStartAt: null,
+    providerInvoiceId: invoice.id,
+    status: invoice.status ?? null,
+    totalAmount: Number(invoice.amount) ?? 0,
   };
 }
 
@@ -242,6 +256,78 @@ export function createRazorpayProvider(
           status: sub.status,
         },
       };
+    },
+
+    async createInvoice(data) {
+      const currency = "INR";
+      const razorpayInvoice = await client.invoices.create({
+        type: "invoice",
+        customer_id: data.providerCustomerId,
+        currency,
+        line_items: data.lines.map((line) => ({
+          amount: line.amount,
+          currency,
+          description: line.description,
+          quantity: 1,
+        })),
+        draft: data.autoAdvance === false ? "1" : undefined,
+        sms_notify: 1,
+        email_notify: 1,
+      });
+
+      return normalizeRazorpayInvoice(razorpayInvoice);
+    },
+
+    async scheduleSubscriptionChange(data) {
+      // const current = await client.subscriptions.fetch(data.providerSubscriptionId);
+
+      // no way of getting this in razorpay or we can give true by default
+      // const wasCanceled = current
+      notSupported("scheduleSubscriptionChange");
+    },
+
+    async cancelSubscription(data) {
+      const sub = await client.subscriptions.cancel(data.providerSubscriptionId, true);
+
+      return {
+        paymentUrl: null,
+        subscription: {
+          cancelAtPeriodEnd: true,
+          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
+          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          providerSubscriptionId: sub.id,
+          status: sub.status,
+        },
+      };
+    },
+
+    async listActiveSubscriptions(data) {
+      const result = await client.subscriptions.all();
+
+      return (result.items ?? [])
+        .filter((sub) => sub.status === "active" && sub.customer_id === data.providerCustomerId)
+        .map((sub) => ({ providerSubscriptionId: sub.id }));
+    },
+
+    async resumeSubscription(data) {
+      const sub = await client.subscriptions.resume(data.providerSubscriptionId, {
+        resume_at: "now",
+      });
+
+      return {
+        paymentUrl: null,
+        subscription: {
+          cancelAtPeriodEnd: true, // no way in razorpay to fetch this via flag,
+          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
+          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          providerSubscriptionId: sub.id,
+          status: sub.status,
+        },
+      };
+    },
+
+    detachPaymentMethod() {
+      return notSupported("detachPaymentMethod");
     },
   };
 }

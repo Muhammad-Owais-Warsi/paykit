@@ -46,7 +46,18 @@ function notSupported(method: string): never {
 
 function toDate(value: Date | string | number | null | undefined): Date | null {
   if (!value) return null;
-  return value instanceof Date ? value : new Date(value);
+
+  if (value instanceof Date) return value;
+
+  if (typeof value === "number") {
+    return new Date(value * 1000);
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return new Date(Number(value) * 1000);
+  }
+
+  return new Date(value);
 }
 
 function normalizeRazorpaySubscription(sub: RazorpaySubscription) {
@@ -234,7 +245,7 @@ export function createRazorpayProvider(
         total_count: 1, // for now set to 1, as paykit doesnt support this prop
       });
 
-      if (checkout.short_url) {
+      if (!checkout.short_url) {
         throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_SESSION_INVALID);
       }
 
@@ -258,8 +269,8 @@ export function createRazorpayProvider(
         paymentUrl: null,
         subscription: {
           cancelAtPeriodEnd: false, // razorpay don't have option to track this, we need to rely on webhooks
-          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
-          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          currentPeriodEndAt: toDate(sub.current_end),
+          currentPeriodStartAt: toDate(sub.current_start),
           providerSubscriptionId: sub.id,
           status: sub.status,
         },
@@ -301,8 +312,8 @@ export function createRazorpayProvider(
         paymentUrl: null,
         subscription: {
           cancelAtPeriodEnd: true,
-          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
-          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          currentPeriodEndAt: toDate(sub.current_end),
+          currentPeriodStartAt: toDate(sub.current_start),
           providerSubscriptionId: sub.id,
           status: sub.status,
         },
@@ -325,9 +336,9 @@ export function createRazorpayProvider(
       return {
         paymentUrl: null,
         subscription: {
-          cancelAtPeriodEnd: true, // no way in razorpay to fetch this via flag,
-          currentPeriodEndAt: sub.current_end ? new Date(sub.current_end) : null,
-          currentPeriodStartAt: sub.current_start ? new Date(sub.current_start) : null,
+          cancelAtPeriodEnd: false, // no way in razorpay to fetch this via flag,
+          currentPeriodEndAt: toDate(sub.current_end),
+          currentPeriodStartAt: toDate(sub.current_start),
           providerSubscriptionId: sub.id,
           status: sub.status,
         },
@@ -346,7 +357,12 @@ export function createRazorpayProvider(
       const signatureHeader = Object.keys(data.headers).find(
         (key) => key.toLowerCase() === "x-razorpay-signature",
       );
-      const signature = signatureHeader ? data.headers[signatureHeader] : undefined;
+      const signature = signatureHeader ? data.headers[signatureHeader]! : "";
+
+      const eventIdHeader = Object.keys(data.headers).find(
+        (key) => key.toLowerCase() === "x-razorpay-event-id",
+      );
+      const eventId = eventIdHeader ? data.headers[eventIdHeader]! : "";
 
       if (!signature) {
         throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_SIGNATURE_MISSING);
@@ -372,14 +388,13 @@ export function createRazorpayProvider(
         throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_WEBHOOK_INVALID);
       }
 
-      const webhookId = event.event ?? "";
       const events: NormalizedWebhookEvent[] = [];
 
       if (event.payload.subscription?.entity) {
         events.push(
           ...createSubscriptionEvents(
             { type: event.event, data: event.payload.subscription.entity },
-            webhookId,
+            eventId,
           ),
         );
       }
@@ -388,7 +403,7 @@ export function createRazorpayProvider(
         events.push(
           ...createCheckoutEvents(
             { type: event.event, data: event.payload.payment.entity },
-            webhookId,
+            eventId,
           ),
         );
       }

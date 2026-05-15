@@ -5,8 +5,7 @@ import {
   type PayKitProviderConfig,
   type PaymentProvider,
 } from "paykitjs";
-import type Razorpay from "razorpay";
-import type { INormalizeError } from "razorpay/dist/types/api";
+import Razorpay from "razorpay";
 import type { Invoices } from "razorpay/dist/types/invoices";
 import type { Payments } from "razorpay/dist/types/payments";
 import type { Subscriptions } from "razorpay/dist/types/subscriptions";
@@ -14,6 +13,7 @@ import type { Subscriptions } from "razorpay/dist/types/subscriptions";
 export interface RazorpayOptions {
   keyId: string;
   keySecret: string;
+  webhookSecret: string;
 }
 
 export type RazorpayProviderConfig = PayKitProviderConfig & {
@@ -24,16 +24,24 @@ type RazorpaySubscription = Subscriptions.RazorpaySubscription;
 type RazorpayPayment = Payments.RazorpayPayment;
 type RazorpayInvoice = Invoices.RazorpayInvoice;
 
+type RazorpayWebhookEvent = {
+  event: string;
+  payload: {
+    payment?: { entity: RazorpayPayment };
+    subscription?: { entity: RazorpaySubscription };
+    invoice?: { entity: RazorpayInvoice };
+  };
+  contains?: string[];
+  created_at: number;
+  account_id?: string;
+};
+
 function notSupported(method: string): never {
   throw PayKitError.from(
     "BAD_REQUEST",
     PAYKIT_ERROR_CODES.PROVIDER_WEBHOOK_INVALID,
     `${method} is not supported by the Razorpay provider.`,
   );
-}
-
-function isRazorpayError(error: unknown): error is INormalizeError {
-  return typeof error === "object" && error !== null && "statusCode" in error && "error" in error;
 }
 
 function toDate(value: Date | string | number | null | undefined): Date | null {
@@ -43,8 +51,8 @@ function toDate(value: Date | string | number | null | undefined): Date | null {
 
 function normalizeRazorpaySubscription(sub: RazorpaySubscription) {
   return {
-    cancelAtPeriodEnd: sub.status === "active" && sub.end_at === sub.current_end ? true : false,
-    canceledAt: sub.status === "cancelled" ? new Date() : null,
+    cancelAtPeriodEnd: false, // by default keeping this false, as in razorpay there's no way of fetching this field. We may need to store this internally in the db.
+    canceledAt: toDate(sub.end_at),
     currentPeriodEndAt: toDate(sub.current_end),
     currentPeriodStartAt: toDate(sub.current_start),
     endedAt: toDate(sub.ended_at),
@@ -328,6 +336,128 @@ export function createRazorpayProvider(
 
     detachPaymentMethod() {
       return notSupported("detachPaymentMethod");
+    },
+
+    syncProducts() {
+      return notSupported("syncProducts");
+    },
+
+    async handleWebhook(data): Promise<NormalizedWebhookEvent[]> {
+      const signatureHeader = Object.keys(data.headers).find(
+        (key) => key.toLowerCase() === "x-razorpay-signature",
+      );
+      const signature = signatureHeader ? data.headers[signatureHeader] : undefined;
+
+      if (!signature) {
+        throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_SIGNATURE_MISSING);
+      }
+
+      const isValid = Razorpay.validateWebhookSignature(
+        data.body,
+        signature,
+        options.webhookSecret,
+      );
+      if (!isValid) {
+        throw PayKitError.from(
+          "BAD_REQUEST",
+          PAYKIT_ERROR_CODES.PROVIDER_SIGNATURE_MISSING,
+          "Invalid Razorpay webhook signature",
+        );
+      }
+
+      let event: RazorpayWebhookEvent;
+      try {
+        event = JSON.parse(data.body) as RazorpayWebhookEvent;
+      } catch {
+        throw PayKitError.from("BAD_REQUEST", PAYKIT_ERROR_CODES.PROVIDER_WEBHOOK_INVALID);
+      }
+
+      const webhookId = event.event ?? "";
+      const events: NormalizedWebhookEvent[] = [];
+
+      if (event.payload.subscription?.entity) {
+        events.push(
+          ...createSubscriptionEvents(
+            { type: event.event, data: event.payload.subscription.entity },
+            webhookId,
+          ),
+        );
+      }
+
+      if (event.payload.payment?.entity) {
+        events.push(
+          ...createCheckoutEvents(
+            { type: event.event, data: event.payload.payment.entity },
+            webhookId,
+          ),
+        );
+      }
+
+      return events;
+    },
+
+    createPortalSession() {
+      return notSupported("createPortalSession");
+    },
+
+    async check() {
+      const mode = options.keyId.startsWith("rzp_test_") ? "test mode" : "live mode";
+
+      try {
+        let webhookEndpoints: Array<{ url: string; status: string }> = [];
+        try {
+          const webhooks = await client.webhooks.all({ count: 50 });
+          webhookEndpoints = (webhooks.items ?? []).map((webhook) => ({
+            url: webhook.url,
+            status: webhook.active ? "active" : "inactive",
+          }));
+        } catch {
+          // webhook listing may fail with restricted keys
+        }
+
+        const customers = await client.customers.all({ count: 5 });
+        const customerSample = (customers.items ?? []).map((customer) => {
+          const notes = customer.notes as Record<string, unknown> | undefined;
+          const paykitCustomerId =
+            notes && typeof notes.paykitCustomerId === "string" ? notes.paykitCustomerId : null;
+
+          return {
+            providerEmail: customer.email ?? "",
+            paykitCustomerId,
+          };
+        });
+
+        return {
+          ok: true,
+          displayName: "Razorpay",
+          mode,
+          webhookEndpoints,
+          customerSample,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          ok: false,
+          displayName: "Razorpay",
+          mode,
+          error: message,
+        };
+      }
+    },
+  };
+}
+
+export function razorpay(razorpayOptions: RazorpayOptions): RazorpayProviderConfig {
+  return {
+    id: "razorpay",
+    name: "Razorpay",
+    capabilities: { testClocks: false },
+    createAdapter(): PaymentProvider {
+      const client = new Razorpay({
+        key_id: razorpayOptions.keyId,
+        key_secret: razorpayOptions.keySecret,
+      });
+      return createRazorpayProvider(client, razorpayOptions);
     },
   };
 }

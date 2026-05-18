@@ -24,4 +24,25 @@ export function assertValidPayKitOptions(
   if (error) {
     throw new Error(error);
   }
+
+  for (const origin of options.trustedOrigins ?? []) {
+    assertValidTrustedOrigin(origin);
+  }
+}
+
+function assertValidTrustedOrigin(origin: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new Error(
+      `PayKit option \`trustedOrigins\` must contain absolute origins only. Received "${origin}".`,
+    );
+  }
+
+  if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+    throw new Error(
+      `PayKit option \`trustedOrigins\` must not include a path, query, or hash. Received "${origin}".`,
+    );
+  }
 }

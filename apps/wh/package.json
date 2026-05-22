@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local",
-    "deploy": "if [ -z \"$PAYKIT_WEBHOOK_API_BASE_URL\" ]; then printf '%s\n' 'Missing PAYKIT_WEBHOOK_API_BASE_URL'; exit 1; fi; wrangler deploy --var \"PAYKIT_WEBHOOK_API_BASE_URL:$PAYKIT_WEBHOOK_API_BASE_URL\"",
+    "deploy": "if [ -z \"${PAYKIT_WEBHOOK_PUBLIC_BASE_URL:-$PAYKIT_WEBHOOK_API_BASE_URL}\" ]; then printf '%s\n' 'Missing PAYKIT_WEBHOOK_PUBLIC_BASE_URL'; exit 1; fi; wrangler deploy --var \"PAYKIT_WEBHOOK_PUBLIC_BASE_URL:${PAYKIT_WEBHOOK_PUBLIC_BASE_URL:-$PAYKIT_WEBHOOK_API_BASE_URL}\"",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",

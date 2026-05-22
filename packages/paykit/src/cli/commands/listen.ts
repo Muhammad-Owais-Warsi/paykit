@@ -11,11 +11,10 @@ import { capture } from "../utils/telemetry";
 
 const DEFAULT_CLOUD_BASE_URL = "https://wh.paykit.sh";
 const DEFAULT_URL = "http://localhost:3000";
-const DEFAULT_BATCH_SIZE = 30;
 const DEFAULT_ERROR_BACKOFF_MS = 2_000;
 const MAX_ERROR_BACKOFF_MS = 15_000;
-const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_RETRY_WINDOW = "5m";
+const CLI_VERSION = "0.0.4";
 const REPLAY_HEADER = "x-paykit-cloud-replay";
 
 interface TunnelResponse {
@@ -66,6 +65,12 @@ interface DeliveryDetails {
   eventId?: string;
   eventType?: string;
 }
+
+type TunnelServerMessage =
+  | { pendingCount: number; tunnelId: string; type: "hello" }
+  | { delivery: DeliveryResponse; type: "delivery" }
+  | { type: "pong" }
+  | { type: "replay_complete" };
 
 interface RelayRuntimeContext {
   account: TunnelAccountSummary;
@@ -250,23 +255,39 @@ async function requestCloud<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${deviceToken}`);
+  headers.set("x-paykit-cli-version", CLI_VERSION);
   if (init.body && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
 
-  const cloudBaseUrl =
-    process.env.PAYKIT_WEBHOOK_API_BASE_URL ??
-    process.env.PAYKIT_CLOUD_URL ??
-    DEFAULT_CLOUD_BASE_URL;
+  const cloudBaseUrl = getCloudBaseUrl();
 
-  const response = await fetch(`${cloudBaseUrl}${pathname}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${cloudBaseUrl}${pathname}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    throw new Error(
+      `Could not connect to the PayKit webhook server at ${cloudBaseUrl}. Is the worker running?`,
+      { cause: error },
+    );
+  }
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
+    if (response.status === 426) {
+      let message = body || "This paykitjs CLI version is no longer supported.";
+      try {
+        const parsed = JSON.parse(body) as { message?: string };
+        message = parsed.message ?? message;
+      } catch {
+        // Non-JSON upgrade responses can still carry a useful text body.
+      }
+      throw new Error(message);
+    }
     const message = contentType.includes("text/html")
       ? `PayKit server request failed (${response.status} ${response.statusText})`
       : body || `PayKit server request failed (${response.status} ${response.statusText})`;
@@ -274,6 +295,179 @@ async function requestCloud<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function getCloudBaseUrl(): string {
+  return (
+    process.env.PAYKIT_CLOUD_URL ??
+    process.env.PAYKIT_WEBHOOK_API_BASE_URL ??
+    DEFAULT_CLOUD_BASE_URL
+  );
+}
+
+function buildTunnelSocketUrl(params: {
+  deviceToken: string;
+  includeFailedBefore?: number;
+  retryWindowMs: number;
+  tunnelId: string;
+}): string {
+  const cloudUrl = new URL(getCloudBaseUrl());
+  cloudUrl.protocol = cloudUrl.protocol === "https:" ? "wss:" : "ws:";
+  cloudUrl.pathname = `/api/tunnels/${params.tunnelId}/connect`;
+  cloudUrl.search = "";
+  cloudUrl.searchParams.set("deviceToken", params.deviceToken);
+  cloudUrl.searchParams.set("cliVersion", CLI_VERSION);
+  cloudUrl.searchParams.set("retryWindowMs", String(params.retryWindowMs));
+  if (typeof params.includeFailedBefore === "number") {
+    cloudUrl.searchParams.set("includeFailedBefore", String(params.includeFailedBefore));
+  }
+  return cloudUrl.toString();
+}
+
+async function connectTunnelSocket(params: {
+  deviceToken: string;
+  includeFailedBefore?: number;
+  retryWindowMs: number;
+  tunnelId: string;
+}): Promise<WebSocket> {
+  const socket = new WebSocket(
+    buildTunnelSocketUrl({
+      deviceToken: params.deviceToken,
+      includeFailedBefore: params.includeFailedBefore,
+      retryWindowMs: params.retryWindowMs,
+      tunnelId: params.tunnelId,
+    }),
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("websocket connection failed"));
+    };
+    const onClose = (event: CloseEvent) => {
+      cleanup();
+      reject(new Error(`websocket closed (${event.code})`));
+    };
+    const cleanup = () => {
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("error", onError);
+      socket.removeEventListener("close", onClose);
+    };
+
+    socket.addEventListener("open", onOpen);
+    socket.addEventListener("error", onError);
+    socket.addEventListener("close", onClose);
+  });
+
+  return socket;
+}
+
+async function consumeTunnelSocket(params: {
+  devLogger: ReturnType<typeof createDevLogger>;
+  localWebhookUrl: string;
+  onReplayComplete: () => void;
+  socket: WebSocket;
+}): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let replayCompleteSeen = false;
+    let processing = Promise.resolve();
+
+    const cleanup = () => {
+      params.socket.removeEventListener("close", onClose);
+      params.socket.removeEventListener("error", onError);
+      params.socket.removeEventListener("message", onMessage);
+    };
+
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      callback();
+    };
+
+    const onClose = () => {
+      processing.finally(() => settle(resolve));
+    };
+    const onError = () => {
+      processing.finally(() => settle(() => reject(new Error("websocket stream failed"))));
+    };
+    const onMessage = (event: MessageEvent) => {
+      processing = processing.then(async () => {
+        const data = typeof event.data === "string" ? event.data : String(event.data);
+        const message = JSON.parse(data) as TunnelServerMessage;
+
+        switch (message.type) {
+          case "delivery": {
+            const result = await replayDelivery({
+              delivery: message.delivery,
+              localWebhookUrl: params.localWebhookUrl,
+            });
+            const details = parseDeliveryDetails(message.delivery.body);
+            const eventId = details.eventId ?? message.delivery.id;
+            const eventType = details.eventType ?? "unknown";
+
+            if (!result.ok) {
+              const statusLabel = result.error ?? String(result.status ?? "failed");
+              params.socket.send(
+                JSON.stringify({
+                  deliveryId: message.delivery.id,
+                  error: statusLabel,
+                  type: "fail",
+                }),
+              );
+              params.devLogger.event({
+                eventId,
+                eventType,
+                replay: !replayCompleteSeen,
+                status: statusLabel,
+              });
+              return;
+            }
+
+            params.socket.send(JSON.stringify({ deliveryId: message.delivery.id, type: "ack" }));
+            params.devLogger.event({
+              eventId,
+              eventType,
+              replay: !replayCompleteSeen,
+              status: result.status ?? 200,
+            });
+            return;
+          }
+          case "replay_complete":
+            replayCompleteSeen = true;
+            params.onReplayComplete();
+            return;
+          case "hello":
+          case "pong":
+            return;
+          default:
+            throw new Error(
+              `Unsupported websocket message type: ${(message as { type?: string }).type}`,
+            );
+        }
+      });
+      processing.catch((error) => {
+        settle(() => reject(error));
+        try {
+          params.socket.close();
+        } catch {
+          // ignore close failures while unwinding the socket loop
+        }
+      });
+    };
+
+    params.socket.addEventListener("close", onClose);
+    params.socket.addEventListener("error", onError);
+    params.socket.addEventListener("message", onMessage);
+  });
 }
 
 async function ensureTunnel(params: {
@@ -313,32 +507,6 @@ async function ackDelivery(params: { deliveryId: string; deviceToken: string }):
   await requestCloud(params.deviceToken, `/api/deliveries/${params.deliveryId}/ack`, {
     method: "POST",
   });
-}
-
-async function pullDeliveries(params: {
-  deviceToken: string;
-  includeFailedBefore?: number;
-  limit: number;
-  offset?: number;
-  retryWindowMs: number;
-  tunnelId: string;
-}): Promise<DeliveryResponse[]> {
-  const search = new URLSearchParams({
-    limit: String(params.limit),
-    retryWindowMs: String(params.retryWindowMs),
-  });
-  if (typeof params.includeFailedBefore === "number") {
-    search.set("includeFailedBefore", String(params.includeFailedBefore));
-  }
-  if (params.offset) {
-    search.set("offset", String(params.offset));
-  }
-
-  const response = await requestCloud<{ deliveries: DeliveryResponse[] }>(
-    params.deviceToken,
-    `/api/tunnels/${params.tunnelId}/pull?${search.toString()}`,
-  );
-  return response.deliveries;
 }
 
 async function getDelivery(params: {
@@ -395,58 +563,6 @@ async function syncProviderWebhook(params: {
   }
 
   return { webhookSecret: providerWebhook.webhookSecret };
-}
-
-async function processPendingDeliveries(params: {
-  devLogger: ReturnType<typeof createDevLogger>;
-  deliveries: DeliveryResponse[];
-  deviceToken: string;
-  localWebhookUrl: string;
-  mode: "live" | "replay";
-}): Promise<{
-  hadDeliveries: boolean;
-  processedCount: number;
-}> {
-  const deliveries = params.deliveries;
-
-  if (deliveries.length === 0) {
-    return { hadDeliveries: false, processedCount: 0 };
-  }
-
-  for (const delivery of deliveries) {
-    const result = await replayDelivery({ delivery, localWebhookUrl: params.localWebhookUrl });
-    const details = parseDeliveryDetails(delivery.body);
-    const eventId = details.eventId ?? delivery.id;
-    const eventType = details.eventType ?? "unknown";
-
-    if (!result.ok) {
-      const statusLabel = result.error ?? String(result.status ?? "failed");
-      await failDelivery({
-        deliveryId: delivery.id,
-        deviceToken: params.deviceToken,
-        error: statusLabel,
-      });
-
-      params.devLogger.event({
-        eventId,
-        eventType,
-        replay: params.mode === "replay",
-        status: statusLabel,
-      });
-      continue;
-    }
-
-    params.devLogger.event({
-      eventId,
-      eventType,
-      replay: params.mode === "replay",
-      status: result.status ?? 200,
-    });
-
-    await ackDelivery({ deliveryId: delivery.id, deviceToken: params.deviceToken });
-  }
-
-  return { hadDeliveries: true, processedCount: deliveries.length };
 }
 
 function getNextErrorBackoff(currentMs: number): number {
@@ -524,36 +640,31 @@ async function listenAction(options: {
     );
   }
 
-  let mode: "live" | "replay" = "replay";
   let errorBackoffMs = 0;
+  let replayCompleteLogged = false;
 
   for (;;) {
     try {
-      const deliveries = await pullDeliveries({
+      const socket = await connectTunnelSocket({
         deviceToken,
-        includeFailedBefore: mode === "replay" ? relayStartedAt : undefined,
-        limit: DEFAULT_BATCH_SIZE,
-        retryWindowMs: mode === "replay" ? retryWindowMs : 0,
+        includeFailedBefore: relayStartedAt,
+        retryWindowMs,
         tunnelId: tunnel.tunnelId,
       });
 
-      const result = await processPendingDeliveries({
+      await consumeTunnelSocket({
         devLogger,
-        deliveries,
-        deviceToken,
         localWebhookUrl,
-        mode,
+        onReplayComplete: () => {
+          if (!replayCompleteLogged) {
+            replayCompleteLogged = true;
+            devLogger.info("replay complete, listening for new webhooks");
+          }
+        },
+        socket,
       });
 
       errorBackoffMs = 0;
-
-      if (!result.hadDeliveries && mode === "replay") {
-        devLogger.info("replay complete, listening for new webhooks");
-        mode = "live";
-        continue;
-      }
-
-      await sleep(result.processedCount > 0 ? 250 : DEFAULT_POLL_INTERVAL_MS);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       devLogger.warn(`Listen loop failed: ${message}`);
@@ -706,7 +817,7 @@ function mergeRelaySubcommandOptions<
 }
 
 export const listenCommand = new Command("listen")
-  .description("Register a provider webhook tunnel, replay missed events, and keep polling")
+  .description("Register a provider webhook tunnel, replay missed events, and stream new webhooks")
   .option(
     "-c, --cwd <cwd>",
     "the working directory. defaults to the current directory.",

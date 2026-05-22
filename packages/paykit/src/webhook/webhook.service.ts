@@ -136,7 +136,6 @@ async function processWebhookEvent(
   ctx: PayKitContext,
   event: AnyNormalizedWebhookEvent,
   providerEventId: string,
-  startTime: number,
 ): Promise<void> {
   // Record the webhook outside the business transaction so failures are preserved.
   const shouldProcess = await beginWebhookEvent(ctx, {
@@ -182,17 +181,15 @@ async function processWebhookEvent(
       await emitCustomerUpdated(ctx, customerId);
     }
 
-    const duration = Date.now() - startTime;
-    ctx.logger.info({ event: event.name, duration }, "webhook processed");
+    ctx.logger.info({ event: event.name }, "webhook processed");
 
     await finishWebhookEvent(ctx, {
       providerEventId,
       status: "processed",
     });
   } catch (error) {
-    const duration = Date.now() - startTime;
     const errorDetail = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    ctx.logger.error({ event: event.name, duration, err: error }, "webhook failed");
+    ctx.logger.error({ event: event.name, err: error }, "webhook failed");
 
     await finishWebhookEvent(ctx, {
       error: errorDetail,
@@ -208,7 +205,6 @@ export async function handleWebhook(
   input: HandleWebhookInput,
 ): Promise<{ received: true }> {
   return ctx.logger.trace.run("wh", async () => {
-    const startTime = Date.now();
     const events = await ctx.provider.handleWebhook({
       allowStaleSignatures: input.allowStaleSignatures,
       body: input.body,
@@ -219,7 +215,7 @@ export async function handleWebhook(
     for (const [index, event] of events.entries()) {
       const providerEventId = getProviderEventId(event, index, parentEventId);
       ctx.logger.info({ event: event.name, providerEventId }, "webhook received");
-      await processWebhookEvent(ctx, event, providerEventId, startTime);
+      await processWebhookEvent(ctx, event, providerEventId);
     }
 
     return { received: true };

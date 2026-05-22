@@ -10,11 +10,11 @@ import { getPayKitConfig } from "../utils/get-config";
 import { capture } from "../utils/telemetry";
 
 const DEFAULT_CLOUD_BASE_URL = "https://wh.paykit.sh";
-const DEFAULT_URL = "http://localhost:3000";
 const DEFAULT_ERROR_BACKOFF_MS = 2_000;
 const MAX_ERROR_BACKOFF_MS = 15_000;
 const DEFAULT_RETRY_WINDOW = "5m";
 const CLI_VERSION = "0.0.4";
+const STABLE_SOCKET_RESET_MS = 30_000;
 const REPLAY_HEADER = "x-paykit-cloud-replay";
 
 interface TunnelResponse {
@@ -60,6 +60,8 @@ interface ReplayResult {
   ok: boolean;
   status?: number;
 }
+
+type DeliveryMode = "direct" | "forward";
 
 interface DeliveryDetails {
   eventId?: string;
@@ -155,7 +157,8 @@ function printReadyBlock(
   devLogger: ReturnType<typeof createDevLogger>,
   params: {
     account: TunnelAccountSummary;
-    localWebhookUrl: string;
+    deliveryMode: DeliveryMode;
+    localWebhookUrl?: string;
     webhookSecret?: string;
     webhookUrl: string;
   },
@@ -173,7 +176,9 @@ function printReadyBlock(
     : "";
 
   devLogger.print(
-    `Webhooks forwarding to ${picocolors.cyan(params.localWebhookUrl)}\n\n` +
+    (params.deliveryMode === "forward" && params.localWebhookUrl
+      ? `Webhooks forwarding to ${picocolors.cyan(params.localWebhookUrl)}\n\n`
+      : "Webhooks forwarding directly to your PayKit instance\n\n") +
       `${bullet} ${providerLabel} ${accountSummary}\n` +
       `${bullet} ${endpointLabel} ${params.webhookUrl}\n` +
       `${bullet} ${secretLabel} ${params.webhookSecret ?? picocolors.dim("(existing secret hidden)")}${reminder}\n` +
@@ -367,12 +372,13 @@ async function connectTunnelSocket(params: {
 }
 
 async function consumeTunnelSocket(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
   devLogger: ReturnType<typeof createDevLogger>;
-  localWebhookUrl: string;
+  forwardTo?: string;
   onReplayComplete: () => void;
   socket: WebSocket;
-}): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
+}): Promise<{ code?: number; reason?: string }> {
+  return new Promise<{ code?: number; reason?: string }>((resolve, reject) => {
     let settled = false;
     let replayCompleteSeen = false;
     let processing = Promise.resolve();
@@ -393,8 +399,10 @@ async function consumeTunnelSocket(params: {
       callback();
     };
 
-    const onClose = () => {
-      processing.finally(() => settle(resolve));
+    const onClose = (event: CloseEvent) => {
+      processing.finally(() =>
+        settle(() => resolve({ code: event.code, reason: event.reason || undefined })),
+      );
     };
     const onError = () => {
       processing.finally(() => settle(() => reject(new Error("websocket stream failed"))));
@@ -406,9 +414,10 @@ async function consumeTunnelSocket(params: {
 
         switch (message.type) {
           case "delivery": {
-            const result = await replayDelivery({
+            const result = await deliverWebhook({
+              config: params.config,
               delivery: message.delivery,
-              localWebhookUrl: params.localWebhookUrl,
+              forwardTo: params.forwardTo,
             });
             const details = parseDeliveryDetails(message.delivery.body);
             const eventId = details.eventId ?? message.delivery.id;
@@ -544,6 +553,34 @@ async function replayDelivery(params: {
   }
 }
 
+async function applyDeliveryDirectly(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
+  delivery: DeliveryResponse;
+}): Promise<ReplayResult> {
+  try {
+    await params.config.paykit.handleWebhook({
+      allowStaleSignatures: true,
+      body: params.delivery.body,
+      headers: params.delivery.headers,
+    });
+    return { ok: true, status: 200 };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error), ok: false };
+  }
+}
+
+async function deliverWebhook(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
+  delivery: DeliveryResponse;
+  forwardTo?: string;
+}): Promise<ReplayResult> {
+  if (params.forwardTo) {
+    return replayDelivery({ delivery: params.delivery, localWebhookUrl: params.forwardTo });
+  }
+
+  return applyDeliveryDirectly({ config: params.config, delivery: params.delivery });
+}
+
 async function syncProviderWebhook(params: {
   deviceToken: string;
   provider: TunnelCapableProvider;
@@ -567,6 +604,10 @@ async function syncProviderWebhook(params: {
 
 function getNextErrorBackoff(currentMs: number): number {
   return currentMs === 0 ? DEFAULT_ERROR_BACKOFF_MS : Math.min(currentMs * 2, MAX_ERROR_BACKOFF_MS);
+}
+
+function isReplacedSessionClose(close: { code?: number; reason?: string }): boolean {
+  return close.code === 1012 && /replaced by a newer session/i.test(close.reason ?? "");
 }
 
 async function loadRelayRuntimeContext(params: {
@@ -594,13 +635,12 @@ async function loadRelayRuntimeContext(params: {
 async function listenAction(options: {
   config?: string;
   cwd: string;
+  forwardTo?: string;
   retry: string;
-  url: string;
 }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
   const retryWindowMs = parseRetryWindowMs(options.retry);
   const relayStartedAt = Date.now();
 
@@ -625,10 +665,16 @@ async function listenAction(options: {
   devLogger.update("Ensuring webhook endpoint");
   const { webhookSecret } = await syncProviderWebhook({ deviceToken, provider, tunnel });
 
-  const localWebhookUrl = buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
+  const localWebhookUrl = options.forwardTo
+    ? buildLocalWebhookUrl(
+        normalizeLocalOrigin(options.forwardTo),
+        config.options.basePath ?? "/paykit",
+      )
+    : undefined;
   devLogger.stop();
   printReadyBlock(devLogger, {
     account,
+    deliveryMode: localWebhookUrl ? "forward" : "direct",
     localWebhookUrl,
     webhookSecret,
     webhookUrl: tunnel.webhookUrl,
@@ -645,6 +691,7 @@ async function listenAction(options: {
 
   for (;;) {
     try {
+      const socketConnectedAt = Date.now();
       const socket = await connectTunnelSocket({
         deviceToken,
         includeFailedBefore: relayStartedAt,
@@ -652,9 +699,10 @@ async function listenAction(options: {
         tunnelId: tunnel.tunnelId,
       });
 
-      await consumeTunnelSocket({
+      const close = await consumeTunnelSocket({
+        config,
         devLogger,
-        localWebhookUrl,
+        forwardTo: localWebhookUrl,
         onReplayComplete: () => {
           if (!replayCompleteLogged) {
             replayCompleteLogged = true;
@@ -664,7 +712,23 @@ async function listenAction(options: {
         socket,
       });
 
-      errorBackoffMs = 0;
+      if (Date.now() - socketConnectedAt >= STABLE_SOCKET_RESET_MS) {
+        errorBackoffMs = 0;
+      }
+      const closeLabel = close.reason
+        ? `${String(close.code ?? "unknown")} ${close.reason}`
+        : String(close.code ?? "unknown");
+
+      if (isReplacedSessionClose(close)) {
+        devLogger.warn(
+          "Another paykitjs listen session connected for this tunnel. Stopping this older session.",
+        );
+        return;
+      }
+
+      devLogger.warn(`Listen connection closed: ${closeLabel}`);
+      errorBackoffMs = getNextErrorBackoff(errorBackoffMs);
+      await sleep(errorBackoffMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       devLogger.warn(`Listen loop failed: ${message}`);
@@ -674,13 +738,12 @@ async function listenAction(options: {
   }
 }
 
-async function enableAction(options: { config?: string; cwd: string; url: string }): Promise<void> {
+async function enableAction(options: { config?: string; cwd: string }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen_enable" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
 
-  const { account, config, deviceToken, provider } = await loadRelayRuntimeContext({
+  const { account, deviceToken, provider } = await loadRelayRuntimeContext({
     configPath: options.config,
     cwd,
     devLogger,
@@ -700,7 +763,6 @@ async function enableAction(options: { config?: string; cwd: string; url: string
   devLogger.update("Ensuring webhook endpoint");
   const { webhookSecret } = await syncProviderWebhook({ deviceToken, provider, tunnel });
 
-  buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
   devLogger.stop();
   printEnableSummary(devLogger, {
     account,
@@ -752,24 +814,28 @@ async function retryAction(options: {
   config?: string;
   cwd: string;
   deliveryId: string;
-  url: string;
+  forwardTo?: string;
 }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen_retry" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
 
   const { config, deviceToken } = await loadRelayRuntimeContext({
     configPath: options.config,
     cwd,
     devLogger,
   });
-  const localWebhookUrl = buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
+  const forwardTo = options.forwardTo
+    ? buildLocalWebhookUrl(
+        normalizeLocalOrigin(options.forwardTo),
+        config.options.basePath ?? "/paykit",
+      )
+    : undefined;
   const delivery = await getDelivery({ deliveryId: options.deliveryId, deviceToken });
   devLogger.stop();
 
   const details = parseDeliveryDetails(delivery.body);
-  const result = await replayDelivery({ delivery, localWebhookUrl });
+  const result = await deliverWebhook({ config, delivery, forwardTo });
   if (!result.ok) {
     const statusLabel = result.error ?? String(result.status ?? "failed");
     await failDelivery({ deliveryId: delivery.id, deviceToken, error: statusLabel });
@@ -799,20 +865,20 @@ async function retryAction(options: {
 }
 
 function mergeRelaySubcommandOptions<
-  TOptions extends { config?: string; cwd?: string; retry?: string; url?: string },
+  TOptions extends { config?: string; cwd?: string; forwardTo?: string; retry?: string },
 >(
   options: TOptions,
   command: Command,
-): { config?: string; cwd: string; retry?: string; url: string } {
+): { config?: string; cwd: string; forwardTo?: string; retry?: string } {
   const parentOptions = command.parent?.opts() as
-    | { config?: string; cwd?: string; retry?: string; url?: string }
+    | { config?: string; cwd?: string; forwardTo?: string; retry?: string }
     | undefined;
 
   return {
     config: options.config ?? parentOptions?.config,
     cwd: options.cwd ?? parentOptions?.cwd ?? process.cwd(),
+    forwardTo: options.forwardTo ?? parentOptions?.forwardTo,
     retry: options.retry ?? parentOptions?.retry,
-    url: options.url ?? parentOptions?.url ?? DEFAULT_URL,
   };
 }
 
@@ -829,7 +895,10 @@ export const listenCommand = new Command("listen")
     "retry failed deliveries received within this window",
     DEFAULT_RETRY_WINDOW,
   )
-  .option("--url <url>", "local app origin", DEFAULT_URL)
+  .option(
+    "--forward-to <url>",
+    "forward webhooks to a local app origin instead of applying directly",
+  )
   .action(listenAction)
   .addCommand(
     new Command("enable")
@@ -840,7 +909,6 @@ export const listenCommand = new Command("listen")
         process.cwd(),
       )
       .option("--config <config>", "the path to the PayKit configuration file to load.")
-      .option("--url <url>", "local app origin")
       .action((options, command) => enableAction(mergeRelaySubcommandOptions(options, command))),
   )
   .addCommand(
@@ -853,7 +921,10 @@ export const listenCommand = new Command("listen")
         process.cwd(),
       )
       .option("--config <config>", "the path to the PayKit configuration file to load.")
-      .option("--url <url>", "local app origin")
+      .option(
+        "--forward-to <url>",
+        "forward webhook to a local app origin instead of applying directly",
+      )
       .action((deliveryId, options, command) =>
         retryAction({
           ...mergeRelaySubcommandOptions(options, command),

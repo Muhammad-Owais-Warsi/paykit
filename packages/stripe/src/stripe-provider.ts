@@ -958,7 +958,7 @@ export function createStripeProvider(client: StripeSdk, options: StripeOptions):
       }
 
       const tolerance = data.allowStaleSignatures ? Number.POSITIVE_INFINITY : undefined;
-      const event = client.webhooks.constructEvent(
+      const event = await client.webhooks.constructEventAsync(
         data.body,
         signature,
         options.webhookSecret,

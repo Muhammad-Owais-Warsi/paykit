@@ -132,19 +132,27 @@ async function loadModule(cwd: string, configPath: string): Promise<unknown> {
   return jiti.import(configPath);
 }
 
-function getPayKit(moduleValue: unknown) {
+type ConfiguredPayKit = {
+  handleWebhook(input: {
+    allowStaleSignatures?: boolean;
+    body: string;
+    headers: Record<string, string>;
+  }): Promise<unknown>;
+  options: PayKitOptions;
+};
+
+function getPayKit(moduleValue: unknown): ConfiguredPayKit | null {
   if (!moduleValue || typeof moduleValue !== "object") return null;
 
   const moduleObject = moduleValue as Record<string, unknown>;
   return (
     [moduleObject.paykit, moduleObject.default].find(
-      (value): value is { options: PayKitOptions } =>
-        isPayKitInstance(value) || isPayKitLike(value),
+      (value): value is ConfiguredPayKit => isPayKitInstance(value) || isPayKitLike(value),
     ) ?? null
   );
 }
 
-function isPayKitLike(value: unknown): value is { options: PayKitOptions } {
+function isPayKitLike(value: unknown): value is ConfiguredPayKit {
   if (!value || typeof value !== "object") return false;
 
   const paykit = value as Record<string, unknown>;
@@ -187,6 +195,7 @@ async function loadConfiguredPayKit(cwd: string, resolvedPath: string) {
 
   return {
     path: resolvedPath,
+    paykit,
     options: paykit.options,
   };
 }

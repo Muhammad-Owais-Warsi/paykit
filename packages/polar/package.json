@@ -1,6 +1,6 @@
 {
   "name": "@paykitjs/polar",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Polar provider adapter for PayKit",
   "license": "MIT",
   "repository": {

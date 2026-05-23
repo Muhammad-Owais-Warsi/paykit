@@ -15,12 +15,21 @@ const dim = (value: unknown) => `\x1b[2m${String(value)}\x1b[0m`;
 const plain = (value: unknown) => `\x1b[39m${String(value)}\x1b[39m`;
 const DETAIL_LINE_PATTERN = /(^|\n)(\s+[^\n]+)/g;
 
+/**
+ * Dims pretty-log detail lines matched by DETAIL_LINE_PATTERN.
+ * @param input The formatted pretty-log output.
+ * @returns The input with detail lines dimmed.
+ */
 function dimDetailLines(input: string): string {
   return input.replace(DETAIL_LINE_PATTERN, (_match, prefix: string, line: string) => {
     return `${prefix}${dim(line)}`;
   });
 }
 
+/**
+ * Creates a pretty logger stream that dims detail lines before stdout.
+ * @returns The configured pretty logger stream.
+ */
 function createPrettyStream() {
   const output = new Transform({
     transform(chunk, _encoding, callback) {

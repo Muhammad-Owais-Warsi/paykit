@@ -19,8 +19,12 @@ interface SocketAttachment {
   replayCompleteSent: boolean;
   retryWindowMs: number;
   role: "cli";
+  sessionId: string;
   tunnelId: string;
 }
+
+const REPLACED_SESSION_CLOSE_CODE = 4001;
+const REPLACED_SESSION_CLOSE_REASON = "paykit.session_replaced";
 
 function now(): number {
   return Date.now();
@@ -160,8 +164,23 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    await this.resetInFlightDeliveriesForActiveSocket(ws);
+  }
+
+  async webSocketError(ws: WebSocket): Promise<void> {
+    await this.resetInFlightDeliveriesForActiveSocket(ws);
+  }
+
+  private async resetInFlightDeliveriesForActiveSocket(ws: WebSocket): Promise<void> {
     const attachment = this.readSocketAttachment(ws);
     if (!attachment) {
+      return;
+    }
+
+    const activeSessionId = await this.ctx.storage.get<string>(
+      this.activeSessionKey(attachment.tunnelId),
+    );
+    if (activeSessionId !== attachment.sessionId) {
       return;
     }
 
@@ -203,9 +222,11 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+    const sessionId = crypto.randomUUID();
 
+    await this.ctx.storage.put(this.activeSessionKey(tunnelId), sessionId);
     await this.resetInFlightDeliveries(tunnelId);
-    this.closeClientSockets("replaced by a newer session");
+    this.closeClientSockets();
     this.ctx.acceptWebSocket(server, ["cli"]);
     server.serializeAttachment({
       deviceTokenHash,
@@ -213,6 +234,7 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
       replayCompleteSent: false,
       retryWindowMs,
       role: "cli",
+      sessionId,
       tunnelId,
     } satisfies SocketAttachment);
 
@@ -249,6 +271,7 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
       replayCompleteSent: socketAttachment.replayCompleteSent ?? false,
       retryWindowMs: socketAttachment.retryWindowMs ?? 0,
       role: "cli",
+      sessionId: socketAttachment.sessionId ?? "",
       tunnelId: socketAttachment.tunnelId,
     };
   }
@@ -313,7 +336,7 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
       return;
     }
 
-    await this.db
+    const claimed = await this.db
       .update(delivery)
       .set({ sentAt: now() })
       .where(
@@ -323,7 +346,12 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
           isNull(delivery.deliveredAt),
           isNull(delivery.sentAt),
         ),
-      );
+      )
+      .returning({ id: delivery.id });
+
+    if (claimed.length !== 1) {
+      return;
+    }
 
     try {
       ws.send(
@@ -354,10 +382,23 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
   }
 
   private async ackDelivery(params: { deliveryId: string; tunnelId: string }): Promise<void> {
-    await this.db
+    const acked = await this.db
       .update(delivery)
       .set({ deliveredAt: now(), error: null, failedAt: null, sentAt: null })
-      .where(and(eq(delivery.id, params.deliveryId), eq(delivery.tunnelId, params.tunnelId)));
+      .where(
+        and(
+          eq(delivery.id, params.deliveryId),
+          eq(delivery.tunnelId, params.tunnelId),
+          isNull(delivery.deliveredAt),
+          isNull(delivery.failedAt),
+          isNotNull(delivery.sentAt),
+        ),
+      )
+      .returning({ id: delivery.id });
+
+    if (acked.length !== 1) {
+      return;
+    }
   }
 
   private async failDelivery(params: {
@@ -384,10 +425,14 @@ export class TunnelObject extends DurableObject<TunnelObjectBindings> {
       );
   }
 
-  private closeClientSockets(reason: string): void {
+  private closeClientSockets(): void {
     for (const socket of this.ctx.getWebSockets("cli")) {
-      socket.close(1012, reason);
+      socket.close(REPLACED_SESSION_CLOSE_CODE, REPLACED_SESSION_CLOSE_REASON);
     }
+  }
+
+  private activeSessionKey(tunnelId: string): string {
+    return `active-session:${tunnelId}`;
   }
 
   private extractTunnelIdFromConnectPath(urlValue: string): string | null {

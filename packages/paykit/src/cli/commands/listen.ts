@@ -15,7 +15,9 @@ const MAX_ERROR_BACKOFF_MS = 15_000;
 const DEFAULT_RETRY_WINDOW = "5m";
 const CLI_VERSION = "0.0.4";
 const STABLE_SOCKET_RESET_MS = 30_000;
+const FORWARD_REPLAY_TIMEOUT_MS = 5_000;
 const REPLAY_HEADER = "x-paykit-cloud-replay";
+const REPLACED_SESSION_CLOSE_CODE = 4001;
 
 interface TunnelResponse {
   found: boolean;
@@ -115,7 +117,7 @@ function parseRetryWindowMs(value: string): number {
 function normalizeLocalOrigin(url: string): string {
   const parsed = new URL(url);
   if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
-    throw new Error(`--url must be an origin only, received "${url}"`);
+    throw new Error(`--forward-to must be an origin only, received "${url}"`);
   }
 
   return parsed.origin;
@@ -539,17 +541,42 @@ async function failDelivery(params: {
 async function replayDelivery(params: {
   delivery: DeliveryResponse;
   localWebhookUrl: string;
+  signal?: AbortSignal;
 }): Promise<ReplayResult> {
   try {
     const response = await fetch(params.localWebhookUrl, {
       body: params.delivery.body,
       headers: sanitizeReplayHeaders(params.delivery.headers),
       method: params.delivery.method,
+      signal: params.signal,
     });
 
     return { ok: response.ok, status: response.status };
   } catch {
     return { error: "connection failed", ok: false };
+  }
+}
+
+async function replayDeliveryWithTimeout(params: {
+  delivery: DeliveryResponse;
+  localWebhookUrl: string;
+  timeoutMs: number;
+}): Promise<ReplayResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), params.timeoutMs);
+
+  try {
+    const result = await replayDelivery({
+      delivery: params.delivery,
+      localWebhookUrl: params.localWebhookUrl,
+      signal: controller.signal,
+    });
+    if (!result.ok && controller.signal.aborted) {
+      return { error: `forward-to timeout: ${params.localWebhookUrl}`, ok: false };
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -575,7 +602,11 @@ async function deliverWebhook(params: {
   forwardTo?: string;
 }): Promise<ReplayResult> {
   if (params.forwardTo) {
-    return replayDelivery({ delivery: params.delivery, localWebhookUrl: params.forwardTo });
+    return replayDeliveryWithTimeout({
+      delivery: params.delivery,
+      localWebhookUrl: params.forwardTo,
+      timeoutMs: FORWARD_REPLAY_TIMEOUT_MS,
+    });
   }
 
   return applyDeliveryDirectly({ config: params.config, delivery: params.delivery });
@@ -607,7 +638,7 @@ function getNextErrorBackoff(currentMs: number): number {
 }
 
 function isReplacedSessionClose(close: { code?: number; reason?: string }): boolean {
-  return close.code === 1012 && /replaced by a newer session/i.test(close.reason ?? "");
+  return close.code === REPLACED_SESSION_CLOSE_CODE;
 }
 
 async function loadRelayRuntimeContext(params: {

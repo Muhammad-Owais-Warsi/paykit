@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && bun --filter demo build",
-  "installCommand": "cd ../.. && bun install",
+  "buildCommand": "cd ../.. && pnpm --filter demo build",
+  "installCommand": "cd ../.. && pnpm install",
   "framework": "nextjs"
 }

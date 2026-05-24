@@ -11,4 +11,4 @@ ln -sf "$ROOT/apps/web/.env" ./apps/web/
 ln -sf "$ROOT/apps/demo/.env" ./apps/demo/
 ln -sf "$ROOT/ob" ./ob
 
-bun install
+pnpm install

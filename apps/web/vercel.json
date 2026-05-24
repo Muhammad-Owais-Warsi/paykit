@@ -1,4 +1,4 @@
 {
-  "ignoreCommand": "bunx turbo-ignore web",
-  "installCommand": "bun install"
+  "ignoreCommand": "pnpm dlx turbo-ignore web",
+  "installCommand": "pnpm install"
 }

@@ -10,6 +10,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "directory": "dist"
+  },
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

@@ -7,7 +7,8 @@ For questions or ideas, open a [GitHub issue](https://github.com/getpaykit/payki
 ## Prerequisites
 
 - **Node.js** >= 22
-- **bun** (install via [bun.sh](https://bun.sh))
+- **pnpm** (enable via `corepack enable`)
+- **bun** — optional, only needed to run the demo app's scripts ([bun.sh](https://bun.sh))
 
 ## Local Setup
 
@@ -16,19 +17,19 @@ For questions or ideas, open a [GitHub issue](https://github.com/getpaykit/payki
 git clone https://github.com/<your-username>/paykit.git
 cd paykit
 
-bun install
-bun build
+pnpm install
+pnpm build
 ```
 
 ## Development
 
 ```bash
-bun dev           # Watch mode (Turbo)
-bun typecheck     # tsc --build
-bun lint          # oxlint --deny-warnings
-bun lint:fix      # Auto-fix lint issues
-bun format        # oxfmt
-bun format:check  # Check formatting without writing
+pnpm dev           # Watch mode (Turbo)
+pnpm typecheck     # tsc --build
+pnpm lint          # oxlint --deny-warnings
+pnpm lint:fix      # Auto-fix lint issues
+pnpm format        # oxfmt
+pnpm format:check  # Check formatting without writing
 ```
 
 ## Monorepo Structure
@@ -83,7 +84,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 feat(stripe): add webhook handler
 fix(paykit): correct subscription renewal logic
 docs: update README setup steps
-chore: bump bun to 1.3.13
+chore: bump pnpm to 11.1.1
 ```
 
 The scope is the **package name** (`paykit`, `stripe`, `dash`, `polar`).
@@ -97,7 +98,7 @@ The scope is the **package name** (`paykit`, `stripe`, `dash`, `polar`).
 When you change anything under `packages/`, run:
 
 ```bash
-bun changeset
+pnpm changeset
 ```
 
 Follow the prompts to describe the change. Commit the generated `.changeset/*.md` file with your PR.

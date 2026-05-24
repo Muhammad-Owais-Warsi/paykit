@@ -46,14 +46,14 @@ jobs:
       E2E_STRIPE_WHSEC: ${{ secrets.E2E_STRIPE_WHSEC }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -103,14 +103,14 @@ jobs:
       E2E_STRIPE_WHSEC: ${{ secrets.E2E_STRIPE_WHSEC }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -131,7 +131,7 @@ jobs:
           done
 
       - name: Setup cloudflared
-        uses: AnimMouse/setup-cloudflared@v2
+        uses: AnimMouse/setup-cloudflared@b80ad7aa7850e1ec9960d75831f32ac9855df988 # v2
 
       - name: Check cloudflared version
         run: cloudflared --version
@@ -187,7 +187,7 @@ jobs:
 
       - name: Upload cloudflared log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           if-no-files-found: ignore
           name: stripe-e2e-cloudflared-log
@@ -222,14 +222,14 @@ jobs:
       E2E_POLAR_WHSEC: ${{ secrets.E2E_POLAR_WHSEC }}
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -250,7 +250,7 @@ jobs:
           done
 
       - name: Setup cloudflared
-        uses: AnimMouse/setup-cloudflared@v2
+        uses: AnimMouse/setup-cloudflared@b80ad7aa7850e1ec9960d75831f32ac9855df988 # v2
 
       - name: Check cloudflared version
         run: cloudflared --version
@@ -306,7 +306,7 @@ jobs:
 
       - name: Upload cloudflared log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           if-no-files-found: ignore
           name: polar-e2e-cloudflared-log

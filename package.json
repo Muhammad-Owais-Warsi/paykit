@@ -21,7 +21,7 @@
     "lint:fix": "oxlint --fix",
     "changeset": "changeset",
     "ci:version": "changeset version && pnpm install --no-frozen-lockfile",
-    "ci:release": "turbo build --filter=./packages/* && changeset publish",
+    "ci:release": "turbo build --filter=./packages/* && node scripts/publish-dist.mjs",
     "prepare": "pnpm exec simple-git-hooks || true",
     "worktree:setup": "bash scripts/worktree-setup.sh"
   },

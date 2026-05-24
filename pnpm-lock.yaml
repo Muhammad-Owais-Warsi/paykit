@@ -58,10 +58,10 @@ importers:
         version: 1.5.0(@date-fns/tz@1.5.0)(@types/react@19.2.15)(date-fns@4.2.1)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@paykitjs/polar':
         specifier: workspace:*
-        version: link:../../packages/polar/dist
+        version: link:../../packages/polar
       '@paykitjs/stripe':
         specifier: workspace:*
-        version: link:../../packages/stripe/dist
+        version: link:../../packages/stripe
       '@t3-oss/env-nextjs':
         specifier: ^0.12.0
         version: 0.12.0(typescript@5.9.3)(zod@4.4.3)
@@ -115,7 +115,7 @@ importers:
         version: 0.4.6(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       paykitjs:
         specifier: workspace:*
-        version: link:../../packages/paykit/dist
+        version: link:../../packages/paykit
       pg:
         specifier: ^8.20.0
         version: 8.21.0
@@ -370,10 +370,10 @@ importers:
     devDependencies:
       '@paykitjs/polar':
         specifier: workspace:*
-        version: link:../packages/polar/dist
+        version: link:../packages/polar
       '@paykitjs/stripe':
         specifier: workspace:*
-        version: link:../packages/stripe/dist
+        version: link:../packages/stripe
       '@t3-oss/env-core':
         specifier: ^0.12.0
         version: 0.12.0(typescript@5.9.3)(zod@4.4.3)
@@ -388,7 +388,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260522.1)(@types/pg@8.20.0)(better-sqlite3@11.10.0)(kysely@0.28.17)(pg@8.21.0)
       paykitjs:
         specifier: workspace:*
-        version: link:../packages/paykit/dist
+        version: link:../packages/paykit
       pg:
         specifier: ^8.20.0
         version: 8.21.0
@@ -427,7 +427,7 @@ importers:
         version: 0.575.0(react@19.2.6)
       paykitjs:
         specifier: workspace:*
-        version: link:../paykit/dist
+        version: link:../paykit
       react:
         specifier: ^19.2.4
         version: 19.2.6
@@ -523,7 +523,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.7(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@5.9.3))(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-    publishDirectory: dist
 
   packages/polar:
     dependencies:
@@ -532,7 +531,7 @@ importers:
         version: 0.47.1
       paykitjs:
         specifier: workspace:*
-        version: link:../paykit/dist
+        version: link:../paykit
     devDependencies:
       tsdown:
         specifier: ^0.21.1
@@ -543,13 +542,12 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.7(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@5.9.3))(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-    publishDirectory: dist
 
   packages/stripe:
     dependencies:
       paykitjs:
         specifier: workspace:*
-        version: link:../paykit/dist
+        version: link:../paykit
       stripe:
         specifier: ^19.1.0
         version: 19.3.1(@types/node@25.9.1)
@@ -563,7 +561,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.7(@types/node@25.9.1)(msw@2.14.6(@types/node@25.9.1)(typescript@5.9.3))(vite@8.0.14(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-    publishDirectory: dist
 
 packages:
 

@@ -15,7 +15,7 @@ function resolveLocalSqliteFile(): string {
   const file = files[0];
   if (!file) {
     throw new Error(
-      "No local D1 SQLite database found. Run `bun --filter wh db:migrate:local` first.",
+      "No local D1 SQLite database found. Run `pnpm --filter wh db:migrate:local` first.",
     );
   }
 

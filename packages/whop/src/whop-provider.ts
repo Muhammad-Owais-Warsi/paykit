@@ -211,7 +211,7 @@ export function createWhopProvider(client: Whop, options: WhopOptions): PaymentP
       });
 
         return result.data
-            .filter((sub) => sub.user.id === data.providerCustomerId)
+            .filter((sub) => sub.user?.id === data.providerCustomerId)
             .map((sub) => ({ providerSubscriptionId: sub.id }));
     },
 

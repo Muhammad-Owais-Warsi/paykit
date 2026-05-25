@@ -263,7 +263,7 @@ export function createWhopProvider(client: Whop, options: WhopOptions): PaymentP
         throw PayKitError.from(
           "BAD_REQUEST",
           PAYKIT_ERROR_CODES.PROVIDER_SIGNATURE_MISSING,
-          "Invalid DodoPayments webhook signature",
+          "Invalid Whop webhook signature",
         );
       }
 

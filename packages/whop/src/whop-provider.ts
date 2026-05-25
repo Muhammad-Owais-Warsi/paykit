@@ -207,10 +207,12 @@ export function createWhopProvider(client: Whop, options: WhopOptions): PaymentP
 
     async listActiveSubscriptions(data) {
       const result = await client.memberships.list({
-        statuses: ["active", "trialing"],
+          statuses: ["active", "trialing"],
       });
 
-      return result.data.map((sub) => ({ providerSubscriptionId: sub.id }));
+        return result.data
+            .filter((sub) => sub.member?.id === data.providerCustomerId)
+            .map((sub) => ({ providerSubscriptionId: sub.id }));
     },
 
     async resumeSubscription(data) {

@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# discover root worktree dir
+CURRENT=$(pwd -P)
 ROOT=$(git worktree list | head -1 | awk '{print $1}')
+ROOT=$(cd "$ROOT" && pwd -P)
+
+if [ "$CURRENT" = "$ROOT" ]; then
+  echo "Refusing to run worktree:setup in the primary worktree ($ROOT)." >&2
+  exit 1
+fi
 
 # alias .env files to root
 ln -sf "$ROOT/.env" ./

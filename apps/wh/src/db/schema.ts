@@ -38,6 +38,7 @@ export const delivery = sqliteTable(
     headers: text("headers", { mode: "json" }).$type<Record<string, string>>().notNull(),
     body: text("body").notNull(),
     receivedAt: integer("received_at", { mode: "number" }).notNull(),
+    sentAt: integer("sent_at", { mode: "number" }),
     deliveredAt: integer("delivered_at", { mode: "number" }),
     failedAt: integer("failed_at", { mode: "number" }),
     error: text("error"),
@@ -46,6 +47,7 @@ export const delivery = sqliteTable(
     index("delivery_tunnel_delivery_idx").on(
       table.tunnelId,
       table.deliveredAt,
+      table.sentAt,
       table.failedAt,
       table.receivedAt,
     ),

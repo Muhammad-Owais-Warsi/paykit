@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { Transform } from "node:stream";
 
 import pino from "pino";
 import pretty from "pino-pretty";
@@ -8,8 +9,37 @@ import { generateId } from "./utils";
 
 const storage = new AsyncLocalStorage<pino.Logger>();
 const PRETTY_LOG_IGNORE_FIELDS = "pid,hostname";
-const PRETTY_LOG_TIMESTAMP = "SYS:HH:MM:ss.l";
+const PRETTY_LOG_TIMESTAMP = "SYS:HH:MM:ss";
 const DEFAULT_LOG_LEVEL = "info";
+const dim = (value: unknown) => `\x1b[2m${String(value)}\x1b[0m`;
+const plain = (value: unknown) => `\x1b[39m${String(value)}\x1b[39m`;
+const DETAIL_LINE_PATTERN = /(^|\n)(\s+[^\n]+)/g;
+
+/**
+ * Dims pretty-log detail lines matched by DETAIL_LINE_PATTERN.
+ * @param input The formatted pretty-log output.
+ * @returns The input with detail lines dimmed.
+ */
+function dimDetailLines(input: string): string {
+  return input.replace(DETAIL_LINE_PATTERN, (_match, prefix: string, line: string) => {
+    return `${prefix}${dim(line)}`;
+  });
+}
+
+/**
+ * Creates a pretty logger stream that dims detail lines before stdout.
+ * @returns The configured pretty logger stream.
+ */
+function createPrettyStream() {
+  const output = new Transform({
+    transform(chunk, _encoding, callback) {
+      callback(null, dimDetailLines(String(chunk)));
+    },
+  });
+
+  output.pipe(process.stdout);
+  return pretty({ ...getPrettyLoggerOptions(), destination: output });
+}
 
 export interface PayKitInternalLogger extends pino.Logger {
   trace: pino.Logger["trace"] & {
@@ -42,13 +72,26 @@ export function getDefaultLoggerOptions(
 }
 
 export function getPrettyLoggerOptions(): pretty.PrettyOptions {
+  const ignore =
+    process.env.PAYKIT_CLI === "1"
+      ? `${PRETTY_LOG_IGNORE_FIELDS},name,traceId`
+      : PRETTY_LOG_IGNORE_FIELDS;
+
   return {
     colorize: true,
-    ignore: PRETTY_LOG_IGNORE_FIELDS,
-    levelFirst: true,
+    colorizeObjects: false,
+    ignore,
+    levelFirst: false,
+    messageFormat: (log, messageKey) => plain(log[messageKey] ?? ""),
     translateTime: PRETTY_LOG_TIMESTAMP,
     customPrettifiers: {
-      time: (timestamp) => `\x1b[2m${String(timestamp)}\x1b[0m`,
+      actionType: dim,
+      duration: dim,
+      event: dim,
+      msg: (message) => String(message),
+      providerEventId: dim,
+      time: dim,
+      traceId: dim,
     },
   };
 }
@@ -60,7 +103,7 @@ export function createPayKitLogger(
   const base =
     logging?.logger ??
     (shouldUsePrettyLogs(environment)
-      ? pino(getDefaultLoggerOptions(logging), pretty(getPrettyLoggerOptions()))
+      ? pino(getDefaultLoggerOptions(logging), createPrettyStream())
       : pino(getDefaultLoggerOptions(logging)));
 
   const handler: ProxyHandler<pino.Logger> = {

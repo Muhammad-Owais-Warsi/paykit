@@ -4,17 +4,22 @@ import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 
 import { delivery, tunnel } from "./db/schema";
+import { TunnelObject, type TunnelObjectBindings } from "./tunnel-object";
 
-interface Bindings {
-  DB: D1Database;
-  MAX_BODY_BYTES: string;
-  MAX_DELIVERIES_PER_TUNNEL: string;
-  PAYKIT_WEBHOOK_API_BASE_URL?: string;
-  RETENTION_DAYS: string;
+interface Bindings extends TunnelObjectBindings {
+  TUNNEL_OBJECT: DurableObjectNamespace<TunnelObject>;
 }
 
 const app = new Hono<{ Bindings: Bindings }>();
 type AppContext = Context<{ Bindings: Bindings }>;
+const MIN_CLI_VERSION = "0.0.4";
+
+interface ParsedVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease: string[];
+}
 
 function getDb(env: Bindings) {
   return drizzle(env.DB);
@@ -28,15 +33,128 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function parseVersion(version: string): ParsedVersion | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4]?.split(".") ?? [],
+  };
+}
+
+function comparePrerelease(left: string[], right: string[]): number {
+  if (left.length === 0 && right.length === 0) {
+    return 0;
+  }
+
+  if (left.length === 0) {
+    return 1;
+  }
+
+  if (right.length === 0) {
+    return -1;
+  }
+
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const leftPart = left[index];
+    const rightPart = right[index];
+
+    if (leftPart === undefined) {
+      return -1;
+    }
+
+    if (rightPart === undefined) {
+      return 1;
+    }
+
+    const leftNumeric = /^\d+$/.test(leftPart);
+    const rightNumeric = /^\d+$/.test(rightPart);
+
+    if (leftNumeric && rightNumeric) {
+      const leftNumber = Number(leftPart);
+      const rightNumber = Number(rightPart);
+      if (leftNumber !== rightNumber) {
+        return leftNumber > rightNumber ? 1 : -1;
+      }
+      continue;
+    }
+
+    if (leftNumeric !== rightNumeric) {
+      return leftNumeric ? -1 : 1;
+    }
+
+    if (leftPart !== rightPart) {
+      return leftPart > rightPart ? 1 : -1;
+    }
+  }
+
+  return 0;
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftVersion = parseVersion(left);
+  const rightVersion = parseVersion(right);
+
+  if (!leftVersion || !rightVersion) {
+    return -1;
+  }
+
+  const leftParts = [leftVersion.major, leftVersion.minor, leftVersion.patch];
+  const rightParts = [rightVersion.major, rightVersion.minor, rightVersion.patch];
+
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index++) {
+    const leftPart = leftParts[index] ?? 0;
+    const rightPart = rightParts[index] ?? 0;
+    if (leftPart !== rightPart) {
+      return leftPart > rightPart ? 1 : -1;
+    }
+  }
+
+  return comparePrerelease(leftVersion.prerelease, rightVersion.prerelease);
+}
+
+function getCliVersion(c: AppContext): string | undefined {
+  return c.req.header("x-paykit-cli-version") ?? c.req.query("cliVersion");
+}
+
+function getCliVersionFromRequest(request: Request): string | undefined {
+  return (
+    request.headers.get("x-paykit-cli-version") ??
+    new URL(request.url).searchParams.get("cliVersion") ??
+    undefined
+  );
+}
+
+function createCliUpgradeResponse(): Response {
+  return Response.json(
+    {
+      code: "CLI_UPGRADE_REQUIRED",
+      message: `This paykitjs CLI version is no longer supported. Upgrade paykitjs to ${MIN_CLI_VERSION} or newer.`,
+      minVersion: MIN_CLI_VERSION,
+    },
+    { status: 426 },
+  );
+}
+
+function isSupportedCliVersion(version: string | undefined): boolean {
+  return typeof version === "string" && compareVersions(version, MIN_CLI_VERSION) >= 0;
+}
+
 function getNumericVar(value: string, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function getRequiredWebhookBaseUrl(env: Bindings): string {
-  const baseUrl = env.PAYKIT_WEBHOOK_API_BASE_URL?.trim();
+  const baseUrl =
+    env.PAYKIT_WEBHOOK_PUBLIC_BASE_URL?.trim() ?? env.PAYKIT_WEBHOOK_API_BASE_URL?.trim();
   if (!baseUrl) {
-    throw new Error("PAYKIT_WEBHOOK_API_BASE_URL is required");
+    throw new Error("PAYKIT_WEBHOOK_PUBLIC_BASE_URL is required");
   }
 
   return baseUrl.replace(/\/$/, "");
@@ -124,11 +242,12 @@ function buildPullableDeliveryWhere(params: {
   const conditions = [
     eq(delivery.tunnelId, params.tunnelId),
     isNull(delivery.deliveredAt),
+    isNull(delivery.sentAt),
     isNull(delivery.failedAt),
   ];
 
   if (params.retryWindowMs > 0 && typeof params.includeFailedBefore === "number") {
-    conditions[2] = or(
+    conditions[3] = or(
       isNull(delivery.failedAt),
       and(
         lt(delivery.failedAt, params.includeFailedBefore),
@@ -149,6 +268,20 @@ async function getPullableCount(
     .from(delivery)
     .where(buildPullableDeliveryWhere(params));
   return rows[0]?.count ?? 0;
+}
+
+function getTunnelStub(env: Bindings, tunnelId: string) {
+  return env.TUNNEL_OBJECT.get(env.TUNNEL_OBJECT.idFromName(tunnelId));
+}
+
+async function notifyTunnelObject(env: Bindings, params: { tunnelId: string }): Promise<void> {
+  const response = await getTunnelStub(env, params.tunnelId).fetch(
+    new Request("https://internal/internal/push", { method: "POST" }),
+  );
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
 }
 
 async function pruneDeliveries(params: {
@@ -183,7 +316,134 @@ async function pruneDeliveries(params: {
   }
 }
 
+async function requireSocketDeviceTokenHashFromRequest(request: Request): Promise<string> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (token) {
+      return hashToken(token);
+    }
+  }
+
+  const token = new URL(request.url).searchParams.get("deviceToken")?.trim();
+  if (!token) {
+    throw new HTTPException(401, { message: "Missing bearer token" });
+  }
+
+  return hashToken(token);
+}
+
+function getConnectTunnelId(pathname: string): string | null {
+  const segments = pathname.split("/").filter(Boolean);
+  if (
+    segments.length === 4 &&
+    segments[0] === "api" &&
+    segments[1] === "tunnels" &&
+    segments[3] === "connect"
+  ) {
+    return segments[2] ?? null;
+  }
+
+  return null;
+}
+
+async function maybeHandleTunnelSocketRequest(
+  request: Request,
+  env: Bindings,
+): Promise<Response | null> {
+  const tunnelId = getConnectTunnelId(new URL(request.url).pathname);
+  if (!tunnelId || request.method !== "GET") {
+    return null;
+  }
+
+  const upgradeHeader = request.headers.get("Upgrade");
+  if (!upgradeHeader || upgradeHeader.toLowerCase() !== "websocket") {
+    return new Response("Expected websocket upgrade", { status: 426 });
+  }
+
+  if (!isSupportedCliVersion(getCliVersionFromRequest(request))) {
+    return createCliUpgradeResponse();
+  }
+
+  const deviceTokenHash = await requireSocketDeviceTokenHashFromRequest(request);
+  const db = getDb(env);
+  const current = await getOwnedTunnel({ db, deviceTokenHash, tunnelId });
+
+  if (!current) {
+    return new Response("Tunnel not found", { status: 404 });
+  }
+
+  if (current.status === "disabled") {
+    return new Response("Tunnel disabled", { status: 410 });
+  }
+
+  return getTunnelStub(env, current.id).fetch(request);
+}
+
+async function maybeHandleProviderWebhookRequest(
+  request: Request,
+  env: Bindings,
+  ctx: ExecutionContext,
+): Promise<Response | null> {
+  const segments = new URL(request.url).pathname.split("/").filter(Boolean);
+  if (request.method !== "POST" || segments.length !== 1) {
+    return null;
+  }
+
+  const tunnelId = segments[0];
+  if (!tunnelId) {
+    return null;
+  }
+
+  const db = getDb(env);
+  const current = await db.select().from(tunnel).where(eq(tunnel.id, tunnelId)).limit(1);
+  const currentTunnel = current[0];
+
+  if (!currentTunnel) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  if (currentTunnel.status !== "active") {
+    return new Response("Tunnel disabled", { status: 410 });
+  }
+
+  const body = await request.text();
+  const bodyBytes = new TextEncoder().encode(body).byteLength;
+  if (bodyBytes > getNumericVar(env.MAX_BODY_BYTES, 262_144)) {
+    return new Response("Payload too large", { status: 413 });
+  }
+
+  await db.insert(delivery).values({
+    body,
+    error: null,
+    failedAt: null,
+    headers: getRequestHeaders(request),
+    id: generateId("del"),
+    method: request.method,
+    receivedAt: now(),
+    sentAt: null,
+    tunnelId: currentTunnel.id,
+  });
+  await pruneDeliveries({ db, env, tunnelId: currentTunnel.id });
+
+  ctx.waitUntil(notifyTunnelObject(env, { tunnelId: currentTunnel.id }));
+
+  return Response.json({ received: true });
+}
+
 app.get("/api/health", (c) => c.json({ ok: true }));
+
+app.use("/api/*", async (c, next) => {
+  if (c.req.path === "/api/health") {
+    return next();
+  }
+
+  if (!isSupportedCliVersion(getCliVersion(c))) {
+    return createCliUpgradeResponse();
+  }
+
+  return next();
+});
 
 app.post("/api/tunnels/ensure", async (c) => {
   const deviceTokenHash = await requireDeviceTokenHash(c);
@@ -326,9 +586,10 @@ app.post("/api/tunnels/:tunnelId/provider-webhook", async (c) => {
     return c.text("providerWebhookEndpointId is required", 400);
   }
 
+  const timestamp = now();
   await db
     .update(tunnel)
-    .set({ providerWebhookEndpointId: body.providerWebhookEndpointId, updatedAt: now() })
+    .set({ providerWebhookEndpointId: body.providerWebhookEndpointId, updatedAt: timestamp })
     .where(eq(tunnel.id, current.id));
 
   return c.json({ ok: true });
@@ -447,8 +708,10 @@ app.post("/api/deliveries/:deliveryId/ack", async (c) => {
 
   await db
     .update(delivery)
-    .set({ deliveredAt: now(), error: null, failedAt: null })
+    .set({ deliveredAt: now(), error: null, failedAt: null, sentAt: null })
     .where(eq(delivery.id, currentDelivery.id));
+
+  await notifyTunnelObject(c.env, { tunnelId: currentTunnel.id });
 
   return c.json({ ok: true });
 });
@@ -483,8 +746,10 @@ app.post("/api/deliveries/:deliveryId/fail", async (c) => {
   const body = (await c.req.json()) as { error?: string };
   await db
     .update(delivery)
-    .set({ error: body.error ?? null, failedAt: now() })
+    .set({ error: body.error ?? null, failedAt: now(), sentAt: null })
     .where(eq(delivery.id, currentDelivery.id));
+
+  await notifyTunnelObject(c.env, { tunnelId: currentTunnel.id });
 
   return c.json({ ok: true });
 });
@@ -511,42 +776,19 @@ app.post("/api/tunnels/:tunnelId/disable", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/:tunnelId", async (c) => {
-  const db = getDb(c.env);
-  const current = await db
-    .select()
-    .from(tunnel)
-    .where(eq(tunnel.id, c.req.param("tunnelId")))
-    .limit(1);
-  const currentTunnel = current[0];
+export default {
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
+    const socketResponse = await maybeHandleTunnelSocketRequest(request, env);
+    if (socketResponse) {
+      return socketResponse;
+    }
 
-  if (!currentTunnel) {
-    return c.text("Not found", 404);
-  }
+    const providerWebhookResponse = await maybeHandleProviderWebhookRequest(request, env, ctx);
+    if (providerWebhookResponse) {
+      return providerWebhookResponse;
+    }
 
-  if (currentTunnel.status !== "active") {
-    return c.text("Tunnel disabled", 410);
-  }
-
-  const body = await c.req.text();
-  const bodyBytes = new TextEncoder().encode(body).byteLength;
-  if (bodyBytes > getNumericVar(c.env.MAX_BODY_BYTES, 262_144)) {
-    return c.text("Payload too large", 413);
-  }
-
-  await db.insert(delivery).values({
-    body,
-    error: null,
-    failedAt: null,
-    headers: getRequestHeaders(c.req.raw),
-    id: generateId("del"),
-    method: c.req.method,
-    receivedAt: now(),
-    tunnelId: currentTunnel.id,
-  });
-  await pruneDeliveries({ db, env: c.env, tunnelId: currentTunnel.id });
-
-  return c.json({ received: true });
-});
-
-export default app;
+    return app.fetch(request, env, ctx);
+  },
+};
+export { TunnelObject };

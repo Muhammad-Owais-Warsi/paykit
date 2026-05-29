@@ -2,66 +2,46 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
+          cache: pnpm
           registry-url: "https://registry.npmjs.org"
 
-      - run: bun install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - run: npx changelogithub
-        continue-on-error: true
+      - name: Create Release Pull Request or Publish
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1
+        with:
+          version: pnpm ci:version
+          publish: pnpm ci:release
+          title: "chore: release"
+          commit: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build
-        run: bun turbo build --filter=./packages/*
-
-      - name: Determine npm tag
-        id: npm_tag
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          if [[ "$TAG" =~ -(alpha|beta|next|rc|canary) ]]; then
-            NPM_TAG="${BASH_REMATCH[1]}"
-          else
-            git fetch origin main
-            if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-              NPM_TAG="latest"
-            else
-              echo "::error::Stable releases must be on the main branch."
-              exit 1
-            fi
-          fi
-          echo "tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
-          echo "Publishing with npm tag: $NPM_TAG"
-
-      - name: Publish to npm
-        shell: bash
-        run: |
-          for package_dir in packages/paykit packages/polar packages/stripe; do
-            (cd "$package_dir/dist" && bun publish --access public --tag "${{ steps.npm_tag.outputs.tag }}")
-          done
-        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

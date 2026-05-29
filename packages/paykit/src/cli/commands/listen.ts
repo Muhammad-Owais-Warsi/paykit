@@ -10,13 +10,14 @@ import { getPayKitConfig } from "../utils/get-config";
 import { capture } from "../utils/telemetry";
 
 const DEFAULT_CLOUD_BASE_URL = "https://wh.paykit.sh";
-const DEFAULT_URL = "http://localhost:3000";
-const DEFAULT_BATCH_SIZE = 30;
 const DEFAULT_ERROR_BACKOFF_MS = 2_000;
 const MAX_ERROR_BACKOFF_MS = 15_000;
-const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_RETRY_WINDOW = "5m";
+const CLI_VERSION = "0.0.4";
+const STABLE_SOCKET_RESET_MS = 30_000;
+const FORWARD_REPLAY_TIMEOUT_MS = 5_000;
 const REPLAY_HEADER = "x-paykit-cloud-replay";
+const REPLACED_SESSION_CLOSE_CODE = 4001;
 
 interface TunnelResponse {
   found: boolean;
@@ -62,10 +63,18 @@ interface ReplayResult {
   status?: number;
 }
 
+type DeliveryMode = "direct" | "forward";
+
 interface DeliveryDetails {
   eventId?: string;
   eventType?: string;
 }
+
+type TunnelServerMessage =
+  | { pendingCount: number; tunnelId: string; type: "hello" }
+  | { delivery: DeliveryResponse; type: "delivery" }
+  | { type: "pong" }
+  | { type: "replay_complete" };
 
 interface RelayRuntimeContext {
   account: TunnelAccountSummary;
@@ -108,7 +117,7 @@ function parseRetryWindowMs(value: string): number {
 function normalizeLocalOrigin(url: string): string {
   const parsed = new URL(url);
   if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
-    throw new Error(`--url must be an origin only, received "${url}"`);
+    throw new Error(`--forward-to must be an origin only, received "${url}"`);
   }
 
   return parsed.origin;
@@ -150,7 +159,8 @@ function printReadyBlock(
   devLogger: ReturnType<typeof createDevLogger>,
   params: {
     account: TunnelAccountSummary;
-    localWebhookUrl: string;
+    deliveryMode: DeliveryMode;
+    localWebhookUrl?: string;
     webhookSecret?: string;
     webhookUrl: string;
   },
@@ -168,7 +178,9 @@ function printReadyBlock(
     : "";
 
   devLogger.print(
-    `Webhooks forwarding to ${picocolors.cyan(params.localWebhookUrl)}\n\n` +
+    (params.deliveryMode === "forward" && params.localWebhookUrl
+      ? `Webhooks forwarding to ${picocolors.cyan(params.localWebhookUrl)}\n\n`
+      : "Webhooks forwarding directly to your PayKit instance\n\n") +
       `${bullet} ${providerLabel} ${accountSummary}\n` +
       `${bullet} ${endpointLabel} ${params.webhookUrl}\n` +
       `${bullet} ${secretLabel} ${params.webhookSecret ?? picocolors.dim("(existing secret hidden)")}${reminder}\n` +
@@ -250,23 +262,39 @@ async function requestCloud<T>(
 ): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${deviceToken}`);
+  headers.set("x-paykit-cli-version", CLI_VERSION);
   if (init.body && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
 
-  const cloudBaseUrl =
-    process.env.PAYKIT_WEBHOOK_API_BASE_URL ??
-    process.env.PAYKIT_CLOUD_URL ??
-    DEFAULT_CLOUD_BASE_URL;
+  const cloudBaseUrl = getCloudBaseUrl();
 
-  const response = await fetch(`${cloudBaseUrl}${pathname}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${cloudBaseUrl}${pathname}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    throw new Error(
+      `Could not connect to the PayKit webhook server at ${cloudBaseUrl}. Is the worker running?`,
+      { cause: error },
+    );
+  }
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
+    if (response.status === 426) {
+      let message = body || "This paykitjs CLI version is no longer supported.";
+      try {
+        const parsed = JSON.parse(body) as { message?: string };
+        message = parsed.message ?? message;
+      } catch {
+        // Non-JSON upgrade responses can still carry a useful text body.
+      }
+      throw new Error(message);
+    }
     const message = contentType.includes("text/html")
       ? `PayKit server request failed (${response.status} ${response.statusText})`
       : body || `PayKit server request failed (${response.status} ${response.statusText})`;
@@ -274,6 +302,183 @@ async function requestCloud<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function getCloudBaseUrl(): string {
+  return (
+    process.env.PAYKIT_CLOUD_URL ??
+    process.env.PAYKIT_WEBHOOK_API_BASE_URL ??
+    DEFAULT_CLOUD_BASE_URL
+  );
+}
+
+function buildTunnelSocketUrl(params: {
+  deviceToken: string;
+  includeFailedBefore?: number;
+  retryWindowMs: number;
+  tunnelId: string;
+}): string {
+  const cloudUrl = new URL(getCloudBaseUrl());
+  cloudUrl.protocol = cloudUrl.protocol === "https:" ? "wss:" : "ws:";
+  cloudUrl.pathname = `/api/tunnels/${params.tunnelId}/connect`;
+  cloudUrl.search = "";
+  cloudUrl.searchParams.set("deviceToken", params.deviceToken);
+  cloudUrl.searchParams.set("cliVersion", CLI_VERSION);
+  cloudUrl.searchParams.set("retryWindowMs", String(params.retryWindowMs));
+  if (typeof params.includeFailedBefore === "number") {
+    cloudUrl.searchParams.set("includeFailedBefore", String(params.includeFailedBefore));
+  }
+  return cloudUrl.toString();
+}
+
+async function connectTunnelSocket(params: {
+  deviceToken: string;
+  includeFailedBefore?: number;
+  retryWindowMs: number;
+  tunnelId: string;
+}): Promise<WebSocket> {
+  const socket = new WebSocket(
+    buildTunnelSocketUrl({
+      deviceToken: params.deviceToken,
+      includeFailedBefore: params.includeFailedBefore,
+      retryWindowMs: params.retryWindowMs,
+      tunnelId: params.tunnelId,
+    }),
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("websocket connection failed"));
+    };
+    const onClose = (event: CloseEvent) => {
+      cleanup();
+      reject(new Error(`websocket closed (${event.code})`));
+    };
+    const cleanup = () => {
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("error", onError);
+      socket.removeEventListener("close", onClose);
+    };
+
+    socket.addEventListener("open", onOpen);
+    socket.addEventListener("error", onError);
+    socket.addEventListener("close", onClose);
+  });
+
+  return socket;
+}
+
+async function consumeTunnelSocket(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
+  devLogger: ReturnType<typeof createDevLogger>;
+  forwardTo?: string;
+  onReplayComplete: () => void;
+  socket: WebSocket;
+}): Promise<{ code?: number; reason?: string }> {
+  return new Promise<{ code?: number; reason?: string }>((resolve, reject) => {
+    let settled = false;
+    let replayCompleteSeen = false;
+    let processing = Promise.resolve();
+
+    const cleanup = () => {
+      params.socket.removeEventListener("close", onClose);
+      params.socket.removeEventListener("error", onError);
+      params.socket.removeEventListener("message", onMessage);
+    };
+
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      callback();
+    };
+
+    const onClose = (event: CloseEvent) => {
+      processing.finally(() =>
+        settle(() => resolve({ code: event.code, reason: event.reason || undefined })),
+      );
+    };
+    const onError = () => {
+      processing.finally(() => settle(() => reject(new Error("websocket stream failed"))));
+    };
+    const onMessage = (event: MessageEvent) => {
+      processing = processing.then(async () => {
+        const data = typeof event.data === "string" ? event.data : String(event.data);
+        const message = JSON.parse(data) as TunnelServerMessage;
+
+        switch (message.type) {
+          case "delivery": {
+            const result = await deliverWebhook({
+              config: params.config,
+              delivery: message.delivery,
+              forwardTo: params.forwardTo,
+            });
+            const details = parseDeliveryDetails(message.delivery.body);
+            const eventId = details.eventId ?? message.delivery.id;
+            const eventType = details.eventType ?? "unknown";
+
+            if (!result.ok) {
+              const statusLabel = result.error ?? String(result.status ?? "failed");
+              params.socket.send(
+                JSON.stringify({
+                  deliveryId: message.delivery.id,
+                  error: statusLabel,
+                  type: "fail",
+                }),
+              );
+              params.devLogger.event({
+                eventId,
+                eventType,
+                replay: !replayCompleteSeen,
+                status: statusLabel,
+              });
+              return;
+            }
+
+            params.socket.send(JSON.stringify({ deliveryId: message.delivery.id, type: "ack" }));
+            params.devLogger.event({
+              eventId,
+              eventType,
+              replay: !replayCompleteSeen,
+              status: result.status ?? 200,
+            });
+            return;
+          }
+          case "replay_complete":
+            replayCompleteSeen = true;
+            params.onReplayComplete();
+            return;
+          case "hello":
+          case "pong":
+            return;
+          default:
+            throw new Error(
+              `Unsupported websocket message type: ${(message as { type?: string }).type}`,
+            );
+        }
+      });
+      processing.catch((error) => {
+        settle(() => reject(error));
+        try {
+          params.socket.close();
+        } catch {
+          // ignore close failures while unwinding the socket loop
+        }
+      });
+    };
+
+    params.socket.addEventListener("close", onClose);
+    params.socket.addEventListener("error", onError);
+    params.socket.addEventListener("message", onMessage);
+  });
 }
 
 async function ensureTunnel(params: {
@@ -315,32 +520,6 @@ async function ackDelivery(params: { deliveryId: string; deviceToken: string }):
   });
 }
 
-async function pullDeliveries(params: {
-  deviceToken: string;
-  includeFailedBefore?: number;
-  limit: number;
-  offset?: number;
-  retryWindowMs: number;
-  tunnelId: string;
-}): Promise<DeliveryResponse[]> {
-  const search = new URLSearchParams({
-    limit: String(params.limit),
-    retryWindowMs: String(params.retryWindowMs),
-  });
-  if (typeof params.includeFailedBefore === "number") {
-    search.set("includeFailedBefore", String(params.includeFailedBefore));
-  }
-  if (params.offset) {
-    search.set("offset", String(params.offset));
-  }
-
-  const response = await requestCloud<{ deliveries: DeliveryResponse[] }>(
-    params.deviceToken,
-    `/api/tunnels/${params.tunnelId}/pull?${search.toString()}`,
-  );
-  return response.deliveries;
-}
-
 async function getDelivery(params: {
   deliveryId: string;
   deviceToken: string;
@@ -362,18 +541,75 @@ async function failDelivery(params: {
 async function replayDelivery(params: {
   delivery: DeliveryResponse;
   localWebhookUrl: string;
+  signal?: AbortSignal;
 }): Promise<ReplayResult> {
   try {
     const response = await fetch(params.localWebhookUrl, {
       body: params.delivery.body,
       headers: sanitizeReplayHeaders(params.delivery.headers),
       method: params.delivery.method,
+      signal: params.signal,
     });
 
     return { ok: response.ok, status: response.status };
   } catch {
     return { error: "connection failed", ok: false };
   }
+}
+
+async function replayDeliveryWithTimeout(params: {
+  delivery: DeliveryResponse;
+  localWebhookUrl: string;
+  timeoutMs: number;
+}): Promise<ReplayResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), params.timeoutMs);
+
+  try {
+    const result = await replayDelivery({
+      delivery: params.delivery,
+      localWebhookUrl: params.localWebhookUrl,
+      signal: controller.signal,
+    });
+    if (!result.ok && controller.signal.aborted) {
+      return { error: `forward-to timeout: ${params.localWebhookUrl}`, ok: false };
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function applyDeliveryDirectly(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
+  delivery: DeliveryResponse;
+}): Promise<ReplayResult> {
+  try {
+    await params.config.paykit.handleWebhook({
+      allowStaleSignatures: true,
+      body: params.delivery.body,
+      headers: params.delivery.headers,
+    });
+    return { ok: true, status: 200 };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error), ok: false };
+  }
+}
+
+async function deliverWebhook(params: {
+  config: Awaited<ReturnType<typeof getPayKitConfig>>;
+  delivery: DeliveryResponse;
+  forwardTo?: string;
+}): Promise<ReplayResult> {
+  if (params.forwardTo) {
+    return replayDeliveryWithTimeout({
+      delivery: params.delivery,
+      localWebhookUrl: params.forwardTo,
+      timeoutMs: FORWARD_REPLAY_TIMEOUT_MS,
+    });
+  }
+
+  return applyDeliveryDirectly({ config: params.config, delivery: params.delivery });
 }
 
 async function syncProviderWebhook(params: {
@@ -397,60 +633,12 @@ async function syncProviderWebhook(params: {
   return { webhookSecret: providerWebhook.webhookSecret };
 }
 
-async function processPendingDeliveries(params: {
-  devLogger: ReturnType<typeof createDevLogger>;
-  deliveries: DeliveryResponse[];
-  deviceToken: string;
-  localWebhookUrl: string;
-  mode: "live" | "replay";
-}): Promise<{
-  hadDeliveries: boolean;
-  processedCount: number;
-}> {
-  const deliveries = params.deliveries;
-
-  if (deliveries.length === 0) {
-    return { hadDeliveries: false, processedCount: 0 };
-  }
-
-  for (const delivery of deliveries) {
-    const result = await replayDelivery({ delivery, localWebhookUrl: params.localWebhookUrl });
-    const details = parseDeliveryDetails(delivery.body);
-    const eventId = details.eventId ?? delivery.id;
-    const eventType = details.eventType ?? "unknown";
-
-    if (!result.ok) {
-      const statusLabel = result.error ?? String(result.status ?? "failed");
-      await failDelivery({
-        deliveryId: delivery.id,
-        deviceToken: params.deviceToken,
-        error: statusLabel,
-      });
-
-      params.devLogger.event({
-        eventId,
-        eventType,
-        replay: params.mode === "replay",
-        status: statusLabel,
-      });
-      continue;
-    }
-
-    params.devLogger.event({
-      eventId,
-      eventType,
-      replay: params.mode === "replay",
-      status: result.status ?? 200,
-    });
-
-    await ackDelivery({ deliveryId: delivery.id, deviceToken: params.deviceToken });
-  }
-
-  return { hadDeliveries: true, processedCount: deliveries.length };
-}
-
 function getNextErrorBackoff(currentMs: number): number {
   return currentMs === 0 ? DEFAULT_ERROR_BACKOFF_MS : Math.min(currentMs * 2, MAX_ERROR_BACKOFF_MS);
+}
+
+function isReplacedSessionClose(close: { code?: number; reason?: string }): boolean {
+  return close.code === REPLACED_SESSION_CLOSE_CODE;
 }
 
 async function loadRelayRuntimeContext(params: {
@@ -478,13 +666,12 @@ async function loadRelayRuntimeContext(params: {
 async function listenAction(options: {
   config?: string;
   cwd: string;
+  forwardTo?: string;
   retry: string;
-  url: string;
 }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
   const retryWindowMs = parseRetryWindowMs(options.retry);
   const relayStartedAt = Date.now();
 
@@ -509,10 +696,16 @@ async function listenAction(options: {
   devLogger.update("Ensuring webhook endpoint");
   const { webhookSecret } = await syncProviderWebhook({ deviceToken, provider, tunnel });
 
-  const localWebhookUrl = buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
+  const localWebhookUrl = options.forwardTo
+    ? buildLocalWebhookUrl(
+        normalizeLocalOrigin(options.forwardTo),
+        config.options.basePath ?? "/paykit",
+      )
+    : undefined;
   devLogger.stop();
   printReadyBlock(devLogger, {
     account,
+    deliveryMode: localWebhookUrl ? "forward" : "direct",
     localWebhookUrl,
     webhookSecret,
     webhookUrl: tunnel.webhookUrl,
@@ -524,36 +717,49 @@ async function listenAction(options: {
     );
   }
 
-  let mode: "live" | "replay" = "replay";
   let errorBackoffMs = 0;
+  let replayCompleteLogged = false;
 
   for (;;) {
     try {
-      const deliveries = await pullDeliveries({
+      const socketConnectedAt = Date.now();
+      const socket = await connectTunnelSocket({
         deviceToken,
-        includeFailedBefore: mode === "replay" ? relayStartedAt : undefined,
-        limit: DEFAULT_BATCH_SIZE,
-        retryWindowMs: mode === "replay" ? retryWindowMs : 0,
+        includeFailedBefore: relayStartedAt,
+        retryWindowMs,
         tunnelId: tunnel.tunnelId,
       });
 
-      const result = await processPendingDeliveries({
+      const close = await consumeTunnelSocket({
+        config,
         devLogger,
-        deliveries,
-        deviceToken,
-        localWebhookUrl,
-        mode,
+        forwardTo: localWebhookUrl,
+        onReplayComplete: () => {
+          if (!replayCompleteLogged) {
+            replayCompleteLogged = true;
+            devLogger.info("replay complete, listening for new webhooks");
+          }
+        },
+        socket,
       });
 
-      errorBackoffMs = 0;
+      if (Date.now() - socketConnectedAt >= STABLE_SOCKET_RESET_MS) {
+        errorBackoffMs = 0;
+      }
+      const closeLabel = close.reason
+        ? `${String(close.code ?? "unknown")} ${close.reason}`
+        : String(close.code ?? "unknown");
 
-      if (!result.hadDeliveries && mode === "replay") {
-        devLogger.info("replay complete, listening for new webhooks");
-        mode = "live";
-        continue;
+      if (isReplacedSessionClose(close)) {
+        devLogger.warn(
+          "Another paykitjs listen session connected for this tunnel. Stopping this older session.",
+        );
+        return;
       }
 
-      await sleep(result.processedCount > 0 ? 250 : DEFAULT_POLL_INTERVAL_MS);
+      devLogger.warn(`Listen connection closed: ${closeLabel}`);
+      errorBackoffMs = getNextErrorBackoff(errorBackoffMs);
+      await sleep(errorBackoffMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       devLogger.warn(`Listen loop failed: ${message}`);
@@ -563,13 +769,12 @@ async function listenAction(options: {
   }
 }
 
-async function enableAction(options: { config?: string; cwd: string; url: string }): Promise<void> {
+async function enableAction(options: { config?: string; cwd: string }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen_enable" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
 
-  const { account, config, deviceToken, provider } = await loadRelayRuntimeContext({
+  const { account, deviceToken, provider } = await loadRelayRuntimeContext({
     configPath: options.config,
     cwd,
     devLogger,
@@ -589,7 +794,6 @@ async function enableAction(options: { config?: string; cwd: string; url: string
   devLogger.update("Ensuring webhook endpoint");
   const { webhookSecret } = await syncProviderWebhook({ deviceToken, provider, tunnel });
 
-  buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
   devLogger.stop();
   printEnableSummary(devLogger, {
     account,
@@ -641,24 +845,28 @@ async function retryAction(options: {
   config?: string;
   cwd: string;
   deliveryId: string;
-  url: string;
+  forwardTo?: string;
 }): Promise<void> {
   const cwd = path.resolve(options.cwd);
   capture("cli_command", { command: "listen_retry" });
   const devLogger = createDevLogger();
-  const localOrigin = normalizeLocalOrigin(options.url);
 
   const { config, deviceToken } = await loadRelayRuntimeContext({
     configPath: options.config,
     cwd,
     devLogger,
   });
-  const localWebhookUrl = buildLocalWebhookUrl(localOrigin, config.options.basePath ?? "/paykit");
+  const forwardTo = options.forwardTo
+    ? buildLocalWebhookUrl(
+        normalizeLocalOrigin(options.forwardTo),
+        config.options.basePath ?? "/paykit",
+      )
+    : undefined;
   const delivery = await getDelivery({ deliveryId: options.deliveryId, deviceToken });
   devLogger.stop();
 
   const details = parseDeliveryDetails(delivery.body);
-  const result = await replayDelivery({ delivery, localWebhookUrl });
+  const result = await deliverWebhook({ config, delivery, forwardTo });
   if (!result.ok) {
     const statusLabel = result.error ?? String(result.status ?? "failed");
     await failDelivery({ deliveryId: delivery.id, deviceToken, error: statusLabel });
@@ -688,25 +896,25 @@ async function retryAction(options: {
 }
 
 function mergeRelaySubcommandOptions<
-  TOptions extends { config?: string; cwd?: string; retry?: string; url?: string },
+  TOptions extends { config?: string; cwd?: string; forwardTo?: string; retry?: string },
 >(
   options: TOptions,
   command: Command,
-): { config?: string; cwd: string; retry?: string; url: string } {
+): { config?: string; cwd: string; forwardTo?: string; retry?: string } {
   const parentOptions = command.parent?.opts() as
-    | { config?: string; cwd?: string; retry?: string; url?: string }
+    | { config?: string; cwd?: string; forwardTo?: string; retry?: string }
     | undefined;
 
   return {
     config: options.config ?? parentOptions?.config,
     cwd: options.cwd ?? parentOptions?.cwd ?? process.cwd(),
+    forwardTo: options.forwardTo ?? parentOptions?.forwardTo,
     retry: options.retry ?? parentOptions?.retry,
-    url: options.url ?? parentOptions?.url ?? DEFAULT_URL,
   };
 }
 
 export const listenCommand = new Command("listen")
-  .description("Register a provider webhook tunnel, replay missed events, and keep polling")
+  .description("Register a provider webhook tunnel, replay missed events, and stream new webhooks")
   .option(
     "-c, --cwd <cwd>",
     "the working directory. defaults to the current directory.",
@@ -718,7 +926,10 @@ export const listenCommand = new Command("listen")
     "retry failed deliveries received within this window",
     DEFAULT_RETRY_WINDOW,
   )
-  .option("--url <url>", "local app origin", DEFAULT_URL)
+  .option(
+    "--forward-to <url>",
+    "forward webhooks to a local app origin instead of applying directly",
+  )
   .action(listenAction)
   .addCommand(
     new Command("enable")
@@ -729,7 +940,6 @@ export const listenCommand = new Command("listen")
         process.cwd(),
       )
       .option("--config <config>", "the path to the PayKit configuration file to load.")
-      .option("--url <url>", "local app origin")
       .action((options, command) => enableAction(mergeRelaySubcommandOptions(options, command))),
   )
   .addCommand(
@@ -742,7 +952,10 @@ export const listenCommand = new Command("listen")
         process.cwd(),
       )
       .option("--config <config>", "the path to the PayKit configuration file to load.")
-      .option("--url <url>", "local app origin")
+      .option(
+        "--forward-to <url>",
+        "forward webhook to a local app origin instead of applying directly",
+      )
       .action((deliveryId, options, command) =>
         retryAction({
           ...mergeRelaySubcommandOptions(options, command),

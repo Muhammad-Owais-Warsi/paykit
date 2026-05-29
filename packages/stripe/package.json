@@ -1,6 +1,6 @@
 {
   "name": "@paykitjs/stripe",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Stripe provider adapter for PayKit",
   "license": "MIT",
   "repository": {

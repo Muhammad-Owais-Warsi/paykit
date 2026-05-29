@@ -3,11 +3,25 @@
   "name": "paykit-wh",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-03",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TUNNEL_OBJECT",
+        "class_name": "TunnelObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TunnelObject"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "paykit-wh",
-      "database_id": "1d9fdd66-9eb5-43fe-ace2-843abce58bf4"
+      "database_name": "paykit-wh-enam",
+      "database_id": "0958661f-897b-45db-8782-16e2bca5aa36"
     }
   ],
   "vars": {

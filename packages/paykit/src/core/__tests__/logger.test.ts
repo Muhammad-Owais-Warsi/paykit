@@ -49,6 +49,7 @@ async function flushLogger(logger: pino.Logger): Promise<void> {
 describe("core/logger", () => {
   afterEach(() => {
     delete process.env.NODE_ENV;
+    delete process.env.PAYKIT_CLI;
   });
 
   it("enables pretty logs for all non-production environments", () => {
@@ -65,12 +66,42 @@ describe("core/logger", () => {
     expect(options.timestamp).toBeTypeOf("function");
     expect(getPrettyLoggerOptions()).toEqual({
       colorize: true,
+      colorizeObjects: false,
       customPrettifiers: {
+        actionType: expect.any(Function),
+        duration: expect.any(Function),
+        event: expect.any(Function),
+        msg: expect.any(Function),
+        providerEventId: expect.any(Function),
         time: expect.any(Function),
+        traceId: expect.any(Function),
       },
       ignore: "pid,hostname",
-      levelFirst: true,
-      translateTime: "SYS:HH:MM:ss.l",
+      levelFirst: false,
+      messageFormat: expect.any(Function),
+      translateTime: "SYS:HH:MM:ss",
+    });
+  });
+
+  it("hides the logger name in CLI pretty logs", () => {
+    process.env.PAYKIT_CLI = "1";
+
+    expect(getPrettyLoggerOptions()).toEqual({
+      colorize: true,
+      colorizeObjects: false,
+      customPrettifiers: {
+        actionType: expect.any(Function),
+        duration: expect.any(Function),
+        event: expect.any(Function),
+        msg: expect.any(Function),
+        providerEventId: expect.any(Function),
+        time: expect.any(Function),
+        traceId: expect.any(Function),
+      },
+      ignore: "pid,hostname,name,traceId",
+      levelFirst: false,
+      messageFormat: expect.any(Function),
+      translateTime: "SYS:HH:MM:ss",
     });
   });
 

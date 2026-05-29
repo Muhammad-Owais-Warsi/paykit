@@ -13,7 +13,9 @@
     "import/no-unassigned-import": "off",
     "typescript/consistent-type-imports": "error",
     "typescript/no-require-imports": "error",
-    "unicorn/prefer-node-protocol": "error"
+    "unicorn/prefer-node-protocol": "error",
+    "eslint/no-underscore-dangle": "off",
+    "unicorn/consistent-function-scoping": "off"
   },
   "overrides": [
     {

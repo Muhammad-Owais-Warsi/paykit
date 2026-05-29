@@ -19,6 +19,7 @@ export type {
   PayKitSubscribeInput,
   PayKitSubscribeResult,
 } from "./types/instance";
+export type { SubscribeResult } from "./subscription/subscription.types";
 export type {
   CheckResult,
   EntitlementBalance,

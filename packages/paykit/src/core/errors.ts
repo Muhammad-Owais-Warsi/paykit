@@ -34,6 +34,7 @@ export const PAYKIT_ERROR_CODES = defineErrorCodes({
   CUSTOMER_ID_REQUIRED: "No customerId provided and no identify configured",
   SUCCESS_URL_REQUIRED:
     "A successUrl is required when subscribe is called without a request context",
+  TRUSTED_ORIGIN_INVALID: "Resolved origin is not in trustedOrigins",
   BASEPATH_INVALID: "basePath must start with a leading slash",
   TESTING_NOT_ENABLED: "Testing mode is not enabled",
   TEST_CLOCK_NOT_FOUND: "Customer does not have a test clock",

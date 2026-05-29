@@ -169,6 +169,7 @@ export function definePayKitMethod<const TConfig extends PayKitMethodConfig, TRe
       stripCustomerId(input),
       request,
       request?.headers,
+      paykit,
     ) as InferMethodInput<TConfig>;
     const customer = config.requireCustomer
       ? await resolveCustomer(
@@ -212,6 +213,7 @@ export function definePayKitMethod<const TConfig extends PayKitMethodConfig, TRe
             : ctx.body,
           ctx.request,
           ctx.headers,
+          ctx.context,
         );
         const customer = config.requireCustomer
           ? await resolveCustomer(ctx.context, ctx.request)
@@ -280,6 +282,7 @@ function normalizeMethodInput(
   input: unknown,
   request?: Request,
   headers?: Headers,
+  paykit?: Pick<PayKitContext, "options">,
 ): unknown {
   if (!(schema instanceof z.ZodObject) || !input || typeof input !== "object") {
     return input;
@@ -295,12 +298,12 @@ function normalizeMethodInput(
     const value = normalized[field];
 
     if (typeof value === "string") {
-      normalized[field] = normalizeReturnUrlValue(field, value, request, headers);
+      normalized[field] = normalizeReturnUrlValue(field, value, request, headers, paykit);
       continue;
     }
 
     if (value == null && shouldDefaultReturnUrlField(field)) {
-      normalized[field] = resolveAbsoluteUrl("/", request, headers, field);
+      normalized[field] = resolveAbsoluteUrl("/", request, headers, paykit, field);
     }
   }
 
@@ -359,9 +362,10 @@ function normalizeReturnUrlValue(
   value: string,
   request?: Request,
   headers?: Headers,
+  paykit?: Pick<PayKitContext, "options">,
 ): string {
   if (isAbsolutePath(value)) {
-    return resolveAbsoluteUrl(value, request, headers, field);
+    return resolveAbsoluteUrl(value, request, headers, paykit, field);
   }
 
   return value;
@@ -375,9 +379,10 @@ function resolveAbsoluteUrl(
   value: string,
   request: Request | undefined,
   headers: Headers | undefined,
+  paykit: Pick<PayKitContext, "options"> | undefined,
   field: string,
 ): string {
-  const origin = resolveOrigin(request, headers);
+  const origin = resolveOrigin(request, headers, paykit);
   if (!origin) {
     throw PayKitError.from(
       "BAD_REQUEST",
@@ -389,23 +394,54 @@ function resolveAbsoluteUrl(
   return new URL(value, origin).toString();
 }
 
-function resolveOrigin(request?: Request, headers?: Headers): string | null {
+function resolveOrigin(
+  request?: Request,
+  headers?: Headers,
+  paykit?: Pick<PayKitContext, "options">,
+): string | null {
+  let origin: string | null = null;
+
   if (request?.url) {
-    return new URL("/", request.url).toString();
+    origin = new URL("/", request.url).toString();
+  } else {
+    const explicitOrigin = headers?.get("origin");
+    if (explicitOrigin && isAbsoluteUrl(explicitOrigin)) {
+      origin = explicitOrigin.endsWith("/") ? explicitOrigin : `${explicitOrigin}/`;
+    } else {
+      const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
+      if (!host) {
+        return null;
+      }
+
+      const protocol = headers?.get("x-forwarded-proto") ?? "https";
+      origin = `${protocol}://${host}/`;
+    }
   }
 
-  const explicitOrigin = headers?.get("origin");
-  if (explicitOrigin && isAbsoluteUrl(explicitOrigin)) {
-    return explicitOrigin.endsWith("/") ? explicitOrigin : `${explicitOrigin}/`;
+  if (origin && paykit?.options.trustedOrigins?.length) {
+    assertTrustedOrigin(origin, paykit.options.trustedOrigins);
   }
 
-  const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
-  if (!host) {
-    return null;
-  }
+  return origin;
+}
 
-  const protocol = headers?.get("x-forwarded-proto") ?? "https";
-  return `${protocol}://${host}/`;
+function assertTrustedOrigin(origin: string, trustedOrigins: readonly string[]): void {
+  const normalizedOrigin = normalizeTrustedOrigin(origin);
+  const isAllowed = trustedOrigins.some((trustedOrigin) => {
+    return normalizeTrustedOrigin(trustedOrigin) === normalizedOrigin;
+  });
+
+  if (!isAllowed) {
+    throw PayKitError.from(
+      "BAD_REQUEST",
+      PAYKIT_ERROR_CODES.TRUSTED_ORIGIN_INVALID,
+      `Resolved origin "${normalizedOrigin}" is not allowed by trustedOrigins`,
+    );
+  }
+}
+
+function normalizeTrustedOrigin(origin: string): string {
+  return new URL(origin).origin;
 }
 
 function isAbsoluteUrl(value: string): boolean {

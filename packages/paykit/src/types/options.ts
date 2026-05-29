@@ -25,6 +25,12 @@ export interface PayKitOptions {
    * @default "/paykit"
    */
   basePath?: string;
+  /**
+   * Allowlist of origins that PayKit may trust when resolving relative return URLs.
+   * Useful to prevent host header spoofing when `successUrl`, `cancelUrl`, or `returnUrl`
+   * are provided as absolute paths like `/billing/success`.
+   */
+  trustedOrigins?: string[];
   identify?: (request: Request) => Promise<{
     customerId: string;
     email?: string;
